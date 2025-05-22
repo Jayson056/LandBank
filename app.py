@@ -39,4 +39,4 @@ def add_customer():
     return redirect('/customers')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=0000, debug=True)  # Set a valid port number (e.g., 5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
