@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>LANDBANK CIMS - Add Customer</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <h1>Add Customer</h1>
+  <form action="/add_customer" method="POST">
+    <input type="text" name="cust_no" placeholder="Customer No" required>
+    <input type="text" name="custname" placeholder="Full Name" required>
+    <input type="date" name="datebirth" required>
+    <input type="text" name="nationality" required>
+    <input type="text" name="citizenship" required>
+    <select name="custsex">
+      <option value="F">Female</option>
+      <option value="M">Male</option>
+    </select>
+    <input type="text" name="placebirth" placeholder="Place of Birth" required>
+    <input type="text" name="civilstatus" placeholder="Married, Single, etc." required>
+    <input type="text" name="mmaiden_name" placeholder="Mother's Maiden Name" required>
+    <input type="number" name="num_children" min="0" placeholder="Children" required>
+    <input type="text" name="cust_address" placeholder="Address" required>
+    <input type="email" name="email_address" placeholder="Email" required>
+    <input type="text" name="contact_no" placeholder="Phone" required>
+    <button type="submit">Save</button>
+  </form>
+  <a href="/customers">View All Customers</a>
+</body>
+</html>
