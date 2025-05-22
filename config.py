@@ -1,7 +1,9 @@
+import os
+
 db_config = {
-    'host': '127.0.0.1',
-    'port': '3306',
-    'user': 'root',
-    'password': 'LandBank@2025',       # update this
-    'database': 'landbank_cims'
+    'host': os.getenv("DB_HOST"),
+    'user': os.getenv("DB_USER"),
+    'password': os.getenv("DB_PASSWORD"),
+    'database': os.getenv("DB_NAME"),
+    'port': 3306
 }
