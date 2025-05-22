@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: landbank-flask
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: DB_HOST
+        value: your-db-host
+      - key: DB_USER
+        value: your-db-user
+      - key: DB_PASSWORD
+        value: your-password
+      - key: DB_NAME
+        value: landbank_cims
