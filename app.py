@@ -85,7 +85,7 @@ def execute_sql_file(filepath):
 
 @app.route('/')
 def landingPage():
-    return render_template('index.html')
+    return render_template('landingPage.html')
 
 @app.route('/login', methods=['POST'])
 def login():
