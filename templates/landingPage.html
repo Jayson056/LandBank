@@ -6,6 +6,11 @@
   <title>LANDBANK CIMS - Login</title>
   <link rel="stylesheet" href="/static/style.css">
   <style>
+    /* Global box-sizing for consistent layout */
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: Arial, sans-serif;
       background-color: #1A5246; /* Dark green background from the image */
@@ -19,21 +24,21 @@
 
     .header {
       display: flex;
-      justify-content: space-between;
       align-items: center;
       padding: 1rem 2rem;
       width: 100%;
-      box-sizing: border-box;
+      position: relative; /* Needed for the logo to be absolutely centered without affecting other elements */
     }
 
     .logo-section {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin: 0 auto; /* Center the logo section */
-      position: absolute; /* Position relative to body for centering */
+      /* Absolute positioning to truly center it regardless of other elements */
+      position: absolute;
       left: 50%;
       transform: translateX(-50%);
+      white-space: nowrap; /* Prevent text wrapping in logo section */
     }
 
     .logo-section img {
@@ -54,6 +59,8 @@
     }
 
     .menu-button {
+      /* Push to the right */
+      margin-left: auto;
       background-color: #2E8B57; /* Slightly lighter green for menu button */
       color: white;
       border: none;
@@ -64,6 +71,7 @@
       display: flex;
       align-items: center;
       gap: 5px;
+      z-index: 10; /* Ensure menu button is above logo if they overlap slightly */
     }
 
     .menu-button .icon {
@@ -151,7 +159,6 @@
       text-align: center;
       padding: 1rem;
       width: 100%;
-      box-sizing: border-box;
     }
 
     .social-icons {
@@ -192,6 +199,54 @@
     .flashed-messages .success {
       color: green;
       background-color: rgba(0, 128, 0, 0.1);
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column; /* Stack logo and menu button */
+        padding: 1rem; /* Reduce padding */
+        align-items: flex-start; /* Align items to the start */
+      }
+
+      .logo-section {
+        position: static; /* Remove absolute positioning on small screens */
+        transform: none; /* Remove transform */
+        margin-bottom: 1rem; /* Add space below logo */
+        width: 100%; /* Take full width */
+        justify-content: center; /* Center logo content within its static position */
+      }
+
+      .menu-button {
+        margin-left: 0; /* Remove auto margin */
+        width: 100%; /* Make button full width */
+      }
+
+      .login-container {
+        padding: 1.5rem; /* Slightly less padding */
+        margin-top: 50px; /* Reduce top margin */
+      }
+    }
+
+    @media (max-width: 480px) {
+      .logo-section h1 {
+        font-size: 2rem; /* Smaller font for very small screens */
+      }
+      .logo-section p {
+        font-size: 0.8rem;
+      }
+      .login-container {
+        padding: 1rem;
+      }
+      input[type=email],
+      input[type=password],
+      button {
+        padding: 0.6rem 10px; /* Smaller padding for inputs/buttons */
+        font-size: 1rem;
+      }
+      .links a {
+        font-size: 0.9rem;
+      }
     }
   </style>
 </head>
