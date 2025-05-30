@@ -27,18 +27,17 @@
       align-items: center;
       padding: 1rem 2rem;
       width: 100%;
-      justify-content: space-between; /* Distribute items with space between them */
-      position: relative; /* Keep relative for potential future absolute elements, but not for logo-section */
+      position: relative; /* Needed for the logo to be absolutely centered without affecting other elements */
     }
 
     .logo-section {
       display: flex;
       align-items: center;
       gap: 10px;
-      /* Removed absolute positioning for better flex behavior */
-      /* Use margin auto to push it to the center when other elements are present */
-      margin-right: auto; /* Push logo to the left, allowing menu to go right */
-      margin-left: auto; /* Try to center it if no other elements */
+      /* Absolute positioning to truly center it regardless of other elements */
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
       white-space: nowrap; /* Prevent text wrapping in logo section */
     }
 
@@ -60,6 +59,8 @@
     }
 
     .menu-button {
+      /* Push to the right */
+      margin-left: 90%;
       background-color: #2E8B57; /* Slightly lighter green for menu button */
       color: white;
       border: none;
@@ -227,7 +228,6 @@
       }
     }
 
-    /* For very small screens (e.g., phones in portrait) */
     @media (max-width: 480px) {
       .logo-section h1 {
         font-size: 2rem; /* Smaller font for very small screens */
@@ -245,30 +245,6 @@
         font-size: 1rem;
       }
       .links a {
-        font-size: 0.9rem;
-      }
-    }
-
-    /* Specific adjustments for landscape orientation on smaller devices if needed */
-    @media screen and (orientation: landscape) and (max-height: 480px) {
-      body {
-        padding-top: 1rem; /* Adjust padding for landscape to prevent elements from being too high */
-      }
-      .login-container {
-        margin-top: 20px; /* Reduce top margin further in landscape */
-        padding: 1rem; /* Smaller padding */
-      }
-      .header {
-        padding: 0.5rem 1rem; /* Smaller header padding */
-      }
-      .logo-section h1 {
-        font-size: 2rem;
-      }
-      .logo-section p {
-        font-size: 0.7rem;
-      }
-      .menu-button {
-        padding: 0.5rem 1rem;
         font-size: 0.9rem;
       }
     }
