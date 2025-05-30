@@ -6,90 +6,236 @@
   <title>LANDBANK CIMS - Login</title>
   <link rel="stylesheet" href="/static/style.css">
   <style>
- .links {
-  margin-top: 1rem;
-  display: flex;
-  justify-content: center;
-  gap: 2rem;
-  border: 3px lightgreen rgb(156, 192, 156);
-}
-
     body {
       font-family: Arial, sans-serif;
-      background-color: #f0f2f5;
+      background-color: #1A5246; /* Dark green background from the image */
       margin: 0;
       padding: 0;
       display: flex;
       flex-direction: column;
       min-height: 100vh;
+      color: white; /* Default text color for the body */
     }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .logo-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 auto; /* Center the logo section */
+      position: absolute; /* Position relative to body for centering */
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .logo-section img {
+      width: 50px; /* Adjust logo size as needed */
+      height: auto;
+    }
+
+    .logo-section h1 {
+      font-size: 2.5rem;
+      margin: 0;
+      color: white;
+    }
+
+    .logo-section p {
+      font-size: 0.9rem;
+      margin: 0;
+      color: #D3D3D3; /* Lighter grey for tagline */
+    }
+
+    .menu-button {
+      background-color: #2E8B57; /* Slightly lighter green for menu button */
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .menu-button .icon {
+      width: 20px;
+      height: 20px;
+      fill: white; /* Fill SVG icon with white */
+    }
+
     .login-container {
       width: 100%;
       max-width: 400px;
-      margin: auto;
+      margin: auto; /* Centers the container vertically and horizontally */
       padding: 2rem;
-      background: white;
+      background: rgba(255, 255, 255, 0.9); /* Slightly transparent white */
       border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      margin-top: 100px;
-    }
-    h2 {
+      box-shadow: 0 0 20px rgba(0,0,0,0.2);
+      color: #333; /* Dark text for the form */
       text-align: center;
     }
+
+    h2 {
+      text-align: center;
+      color: #1A5246; /* Match header green */
+      margin-bottom: 1.5rem;
+    }
+
     input[type=email],
     input[type=password] {
-      width: 100%;
-      padding: 0.75rem;
-      margin: 0.5rem 0;
+      width: calc(100% - 20px); /* Adjust for padding */
+      padding: 0.75rem 10px;
+      margin: 0.75rem 0;
       border: 1px solid #ccc;
-      border-radius: 5px;
+      border-radius: 25px; /* More rounded corners for inputs */
+      background-color: #f9f9f9;
+      color: #333;
     }
+
+    input[type=email]::placeholder,
+    input[type=password]::placeholder {
+      color: #888;
+    }
+
     button {
       width: 100%;
       padding: 0.75rem;
-      background: green;
+      background: #2E8B57; /* Green button */
       color: white;
       border: none;
-      border-radius: 5px;
+      border-radius: 25px; /* More rounded corners for button */
       cursor: pointer;
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin-top: 1rem;
+      transition: background-color 0.3s ease;
     }
+
+    button:hover {
+      background-color: #287A4C; /* Darker green on hover */
+    }
+
+    .links {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-direction: column; /* Stack links vertically */
+      gap: 1rem; /* Space between stacked links */
+      align-items: center; /* Center links horizontally */
+    }
+
     .links a {
-      color: green;
+      color: #1A5246; /* Green for links */
       text-decoration: none;
+      font-weight: bold;
+      font-size: 1rem;
+      transition: color 0.3s ease;
     }
+
+    .links a:hover {
+      color: #2E8B57; /* Lighter green on hover */
+    }
+
     footer {
-      margin-top: auto;
-      background: #333;
+      margin-top: auto; /* Pushes footer to the bottom */
+      background: rgba(0, 0, 0, 0.3); /* Semi-transparent dark background */
       color: white;
       text-align: center;
       padding: 1rem;
+      width: 100%;
+      box-sizing: border-box;
     }
-    .social-icons img {
-      width: 24px;
+
+    .social-icons {
+      display: flex;
+      justify-content: center; /* Center social icons */
+      margin-bottom: 10px;
+    }
+
+    .social-icons a {
       margin: 0 10px;
+    }
+
+    .social-icons img {
+      width: 28px; /* Slightly larger icons */
+      height: 28px;
+      filter: invert(100%); /* Make icons white */
+      transition: transform 0.2s ease;
+    }
+
+    .social-icons img:hover {
+      transform: translateY(-3px); /* Slight lift on hover */
+    }
+
+    .flashed-messages {
+      text-align: center;
+      margin: 10px 0;
+      padding: 5px;
+      border-radius: 5px;
+    }
+    .flashed-messages p {
+      margin: 5px 0;
+      font-weight: bold;
+    }
+    .flashed-messages .error {
+      color: red;
+      background-color: rgba(255, 0, 0, 0.1);
+    }
+    .flashed-messages .success {
+      color: green;
+      background-color: rgba(0, 128, 0, 0.1);
     }
   </style>
 </head>
 <body>
+  <div class="header">
+    <div class="logo-section">
+      <img src="https://placehold.co/50x50/1A5246/FFFFFF?text=L" alt="LANDBANK Logo">
+      <div>
+        <h1>LANDBANK</h1>
+        <p>Empowering Filipinos for a Better Future</p>
+      </div>
+    </div>
+    <button class="menu-button">
+      <svg class="icon" viewBox="0 0 24 24">
+        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+      </svg>
+      MENU
+    </button>
+  </div>
+
   <div class="login-container">
     <h2>Login to LANDBANK</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flashed-messages">
+          {% for category, message in messages %}
+            <p class="{{ category }}">{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
     <form action="/login" method="POST">
-      <input type="email" name="email" placeholder="Email" required>
-      <input type="password" name="password" placeholder="Password" required>
-      <button type="submit">Login</button>
-      {% with messages = get_flashed_messages() %}
-  {% if messages %}
-    <p style="color: red; text-align: center; font-size: 10%;">{{ messages[0] }}</p>
-  {% endif %}
-        {% endwith %}
+      <input type="email" name="email" placeholder="EMAIL" required>
+      <input type="password" name="password" placeholder="PASSWORD" required>
+      <button type="submit">LOGIN</button>
     </form>
     <div class="links">
-      <a href="/openAcc">Open an Account</a>
+      <a href="/openAcc">OPEN AN ACCOUNT</a>
+      <a href="#">APPLY FOR A LOAN</a>
     </div>
-    <div class="links">
-        <a href="#">Apply for Loan</a>
-      </div>
   </div>
+
   <footer>
     <div class="social-icons">
       <a href="#"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/facebook.svg" alt="Facebook"></a>
