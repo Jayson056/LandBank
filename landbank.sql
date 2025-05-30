@@ -1,33 +1,54 @@
-CREATE TABLE IF NOT EXISTS Customer (
-    cust_no VARCHAR(10) PRIMARY KEY,
-    custname VARCHAR(100) NOT NULL,
-    email_address VARCHAR(100) UNIQUE NOT NULL,
-    phone_no VARCHAR(20),
-    address VARCHAR(255),
-    password VARCHAR(255) NOT NULL,
-    account_balance DECIMAL(15, 2) DEFAULT 0.00
-);
+-- landbank.sql
+-- PostgreSQL compatible schema with IF NOT EXISTS
 
+-- Reference Tables (ID Generators)
 CREATE TABLE IF NOT EXISTS SpouseCode (
-    spouse_code VARCHAR(10) PRIMARY KEY,
-    description VARCHAR(100)
+    spouse_code SERIAL PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS Occupation (
-    occupation_code VARCHAR(10) PRIMARY KEY,
-    description VARCHAR(100)
+    occ_id SERIAL PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS FinancialRecord (
-    record_id SERIAL PRIMARY KEY,
-    cust_no VARCHAR(10) REFERENCES Customer(cust_no),
-    record_type VARCHAR(50), -- e.g., 'deposit', 'withdrawal', 'transfer'
-    amount DECIMAL(15, 2) NOT NULL,
-    transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    fin_code SERIAL PRIMARY KEY
 );
 
--- Add any other tables you have with IF NOT EXISTS
--- CREATE TABLE IF NOT EXISTS AnotherTable ( ... );
+-- Main Customer Table
+CREATE TABLE IF NOT EXISTS Customer (
+    cust_no VARCHAR(10) PRIMARY KEY,
+    custname VARCHAR(50) NOT NULL,
+    datebirth DATE NOT NULL,
+    nationality VARCHAR(20) NOT NULL,
+    citizenship VARCHAR(20) NOT NULL,
+    custsex VARCHAR(1) CHECK (custsex IN ('M', 'F')) NOT NULL,
+    placebirth VARCHAR(100) NOT NULL,
+    civilstatus VARCHAR(20) CHECK (civilstatus IN ('Single', 'Married', 'Widowed', 'Divorced', 'Separated')) NOT NULL,
+    num_children INT NOT NULL,
+    mmaiden_name VARCHAR(50) NOT NULL,
+    cust_address VARCHAR(100) NOT NULL,
+    email_address VARCHAR(50) NOT NULL UNIQUE,
+    contact_no VARCHAR(20) NOT NULL,
+    spouse_code INT,
+    occ_id INT,
+    fin_code INT,
+    password VARCHAR(255) NOT NULL, -- Added password field for login
+    FOREIGN KEY (spouse_code) REFERENCES SpouseCode(spouse_code) ON DELETE SET NULL,
+    FOREIGN KEY (occ_id) REFERENCES Occupation(occ_id) ON DELETE SET NULL,
+    FOREIGN KEY (fin_code) REFERENCES FinancialRecord(fin_code) ON DELETE SET NULL
+);
 
--- You might also want to add initial data if needed, but ensure it's idempotent
--- E.g., INSERT INTO SpouseCode (spouse_code, description) VALUES ('S001', 'Married') ON CONFLICT (spouse_code) DO NOTHING;
+-- Optional Spouse Details
+CREATE TABLE IF NOT EXISTS Spouse (
+    spouse_id SERIAL PRIMARY KEY,
+    spouse_code INT UNIQUE,
+    name VARCHAR(50),
+    birthdate DATE,
+    profession VARCHAR(50),
+    FOREIGN KEY (spouse_code) REFERENCES SpouseCode(spouse_code) ON DELETE CASCADE
+);
+
+-- Dummy data for testing (optional, remove for production)
+-- INSERT INTO Customer (cust_no, custname, datebirth, nationality, citizenship, custsex, placebirth, civilstatus, num_children, mmaiden_name, cust_address, email_address, contact_no, password)
+-- VALUES ('admin', 'Admin User', '1980-01-01', 'Filipino', 'Filipino', 'M', 'Manila', 'Married', 0, 'N/A', 'Admin Office', 'landbankADMIN@gmail.com', '09171234567', 'LandBank2025')
+-- ON CONFLICT (cust_no) DO NOTHING;
