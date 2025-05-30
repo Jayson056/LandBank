@@ -1,20 +1,26 @@
 # app.py
 from flask import Flask, render_template, request, redirect, session, url_for, flash
-import mysql.connector
+import psycopg2 # CHANGE THIS LINE from mysql.connector
 from config import db_config
 import datetime
-import os # Import os for file path checking
+import os
 
 app = Flask(__name__)
 app.secret_key = 'landbank_secret_key'
 
-# app.py
 def get_db_connection():
     try:
-        print(f"Attempting to connect with db_config: {db_config['host']}:{db_config['port']}/{db_config['database']} (user: {db_config['user']})")
-        return mysql.connector.connect(**db_config)
-    except mysql.connector.Error as err:
-        print(f"Error connecting to database: {err}")
+        # PostgreSQL connection string arguments are slightly different
+        print(f"Attempting to connect to PostgreSQL with: host={db_config['host']} port={db_config['port']} dbname={db_config['database']} user={db_config['user']}")
+        return psycopg2.connect(
+            host=db_config['host'],
+            port=db_config['port'],
+            database=db_config['database'],
+            user=db_config['user'],
+            password=db_config['password']
+        )
+    except psycopg2.Error as err: # CHANGE THIS to psycopg2.Error
+        print(f"Error connecting to PostgreSQL database: {err}")
         raise
 
 # Function to execute SQL from a file
@@ -25,21 +31,37 @@ def execute_sql_file(filepath):
         cursor = conn.cursor()
         with open(filepath, 'r') as f:
             sql_script = f.read()
-            # Split by semicolon to execute multiple statements
+            # Psycopg2 doesn't have a multi-statement execute by default,
+            # so we'll split by semicolon and execute one by one.
+            # However, for 'CREATE DATABASE' you can't be connected to it,
+            # and for 'USE database;' it's not a PostgreSQL concept.
+            # We will handle these separately.
+
+            # IMPORTANT: PostgreSQL 'CREATE DATABASE' command must be executed
+            # while connected to a different database (e.g., 'postgres' or default).
+            # Also, 'USE database;' is not a PostgreSQL concept; you connect directly to the database.
+            # This 'landbank.sql' needs to be adjusted for PostgreSQL.
+
             statements = [s.strip() for s in sql_script.split(';') if s.strip()]
             for statement in statements:
                 try:
+                    # Special handling for 'CREATE DATABASE'
+                    if statement.upper().startswith("CREATE DATABASE"):
+                        # This part is tricky. You'd typically connect to a default database (like 'postgres')
+                        # to create a new database.
+                        # For Render, the database 'landbank' (or whatever you configured) is already created when you provision the service.
+                        # So, you don't need 'CREATE DATABASE' or 'USE landbank;' in your landbank.sql file.
+                        print(f"Skipping: '{statement}' (Database already created on Render)")
+                        continue # Skip CREATE DATABASE for Render's managed service
+
                     cursor.execute(statement)
-                except mysql.connector.Error as err:
-                    # Print error for specific statement but continue if possible
+                except psycopg2.Error as err: # CHANGE THIS to psycopg2.Error
                     print(f"Error executing statement: {statement}\nError: {err}")
                     # Decide if you want to stop on first error or try to continue
-                    # For CREATE TABLE, you might want to continue, but for other DDL/DML, stop.
-                    # For this setup, we'll continue for robustness with IF NOT EXISTS.
         conn.commit()
         print(f"Successfully executed SQL from {filepath}")
         return True
-    except mysql.connector.Error as err:
+    except psycopg2.Error as err: # CHANGE THIS to psycopg2.Error
         print(f"Error during SQL file execution: {err}")
         if conn:
             conn.rollback()
