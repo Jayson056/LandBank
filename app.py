@@ -1,9 +1,9 @@
-# app.py
 from flask import Flask, render_template, request, redirect, session, url_for, flash
 import psycopg2
 import psycopg2.extras # For DictCursor
 import os
 import datetime
+import re # Import regex module for robust SQL parsing
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default_secret_key_for_dev') # Get from env or use default
@@ -18,13 +18,17 @@ def get_db_connection():
         # Fallback for local development if DATABASE_URL is not set
         # IMPORTANT: Replace with your actual local PostgreSQL credentials
         # This block should ideally be removed or secured in production
-        from config import db_config
-        conn_string = (
-            f"host={db_config['host']} port={db_config['port']} "
-            f"dbname={db_config['database']} user={db_config['user']} "
-            f"password={db_config['password']}"
-        )
-        print("Using local db_config fallback.")
+        try:
+            from config import db_config
+            conn_string = (
+                f"host={db_config['host']} port={db_config['port']} "
+                f"dbname={db_config['database']} user={db_config['user']} "
+                f"password={db_config['password']}"
+            )
+            print("Using local db_config fallback.")
+        except ImportError:
+            print("Error: config.py not found and DATABASE_URL not set. Cannot connect to database.")
+            raise # Re-raise to stop execution if no config is available
     else:
         conn_string = DATABASE_URL
         print("Using DATABASE_URL from environment.")
@@ -42,43 +46,55 @@ def get_db_connection():
 # Function to execute SQL from a file (for initial database setup)
 def execute_sql_file(filepath):
     conn = None
+    cursor = None # Define cursor outside try for finally block
     try:
         conn = get_db_connection()
-        # Use a regular cursor for DDL statements
+        conn.autocommit = False # Ensure explicit transaction control for DDL
         cursor = conn.cursor()
+        
         with open(filepath, 'r') as f:
             sql_script = f.read()
-            # Split by semicolon to execute multiple statements
-            # Filter out empty strings after splitting
+
+            # Robustly split SQL by semicolons, handling comments and empty lines
+            # Remove block comments /* ... */
+            sql_script = re.sub(r'/\*.*?\*/', '', sql_script, flags=re.DOTALL)
+            # Remove line comments -- ...
+            sql_script = re.sub(r'--.*', '', sql_script)
+            
+            # Split by semicolon and filter out empty statements
             statements = [s.strip() for s in sql_script.split(';') if s.strip()]
 
-            for statement in statements:
-                try:
-                    # Skip CREATE DATABASE and USE commands as they are not needed for Render's managed PG
-                    if statement.upper().startswith("CREATE DATABASE") or statement.upper().startswith("USE "):
-                        print(f"Skipping: '{statement[:50]}...' (Not applicable for Render PostgreSQL)")
-                        continue
+        for statement in statements:
+            # Skip CREATE DATABASE and USE commands as they are not needed for Render's managed PG
+            if statement.upper().startswith("CREATE DATABASE") or statement.upper().startswith("USE "):
+                print(f"Skipping: '{statement[:50]}...' (Not applicable for Render PostgreSQL)")
+                continue
+            
+            try:
+                cursor.execute(statement)
+                print(f"Executed SQL: {statement[:70]}...")
+            except psycopg2.ProgrammingError as err:
+                # Catch specific programming errors (e.g., relation already exists)
+                # This is common with CREATE TABLE IF NOT EXISTS and is usually benign.
+                print(f"SQL statement error (might be benign due to IF NOT EXISTS): {statement[:100]}...\nError: {err}")
+                # Do NOT rollback here, let the outer try/except handle critical failures
+            except Exception as err:
+                # Catch any other unexpected errors during statement execution that are critical
+                print(f"CRITICAL Error executing statement: {statement[:100]}...\nError: {err}")
+                raise # Re-raise critical errors to trigger the outer rollback for the entire transaction
 
-                    cursor.execute(statement)
-                    print(f"Executed SQL: {statement[:70]}...")
-                except psycopg2.Error as err:
-                    # Log errors for individual statements but try to continue if possible
-                    print(f"Error executing statement: {statement[:100]}...\nError: {err}")
-                    # Rollback changes if a statement fails
-                    conn.rollback()
-                    # For CREATE TABLE IF NOT EXISTS, errors might be notices, so this is fine.
-                    # If a critical error occurs that should stop the setup, re-raise here.
-        conn.commit() # Commit all successful DDL operations
+        conn.commit() # Commit all successful DDL operations if no critical error occurred
         print(f"Successfully executed SQL from {filepath}")
         return True
-    except Exception as e: # Catch broader exceptions during file reading or connection
+    except Exception as e: # Catch broader exceptions during file reading, connection, or critical SQL errors
         print(f"Database setup error: {e}")
         if conn:
             conn.rollback() # Ensure rollback on any setup error
         return False
     finally:
-        if conn:
+        if cursor:
             cursor.close()
+        if conn:
             conn.close()
 
 # --- Flask Routes ---
@@ -484,6 +500,7 @@ def add_customer():
         fin_code = None
 
         # Handle Spouse, Occupation, FinancialRecord creation/linking
+        # Spouse is optional, so only create if spouse_name is provided
         if data.get('spouse_name'):
             cursor.execute("INSERT INTO SpouseCode DEFAULT VALUES RETURNING spouse_code")
             spouse_code = cursor.fetchone()[0]
@@ -493,6 +510,7 @@ def add_customer():
             """, (spouse_code, data.get('spouse_name'), data.get('spouse_birthdate'), data.get('spouse_profession')))
 
         # For Occupation and FinancialRecord, creating empty records if no specific data is provided
+        # These are always created to get an ID for the customer record
         cursor.execute("INSERT INTO Occupation DEFAULT VALUES RETURNING occ_id")
         occ_id = cursor.fetchone()[0]
 
@@ -509,11 +527,18 @@ def add_customer():
         """
         # IMPORTANT: In a real app, hash the password before inserting!
         # For now, using plain text for demonstration matching your login logic.
+        # The 'password' field is not directly in your openAcc.html form,
+        # so you might need to add it or generate a default/temporary one.
+        # For this example, I'm assuming you'll add a password field to the form
+        # or handle it in some other way. If not, this will fail.
+        # For demonstration, let's use cust_no as a temporary password if not provided.
+        customer_password = data.get('password', data['cust_no']) # Fallback to cust_no if password field is missing
+
         cursor.execute(insert_customer_query, (
             data['cust_no'], data['custname'], data['datebirth'], data['nationality'], data['citizenship'],
             data['custsex'], data['placebirth'], data['civilstatus'], data['num_children'], data['mmaiden_name'],
             data['cust_address'], data['email_address'], data['contact_no'],
-            spouse_code, occ_id, fin_code, data['password'] # Pass the password
+            spouse_code, occ_id, fin_code, customer_password # Pass the password
         ))
 
         conn.commit()
