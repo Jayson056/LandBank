@@ -8,13 +8,13 @@ import os # Import os for file path checking
 app = Flask(__name__)
 app.secret_key = 'landbank_secret_key'
 
+# app.py
 def get_db_connection():
     try:
+        print(f"Attempting to connect with db_config: {db_config['host']}:{db_config['port']}/{db_config['database']} (user: {db_config['user']})")
         return mysql.connector.connect(**db_config)
     except mysql.connector.Error as err:
         print(f"Error connecting to database: {err}")
-        # Depending on your deployment, you might want to log this or flash an error
-        # For now, we'll re-raise to show the original traceback if connection fails
         raise
 
 # Function to execute SQL from a file
