@@ -1,8 +1,8 @@
 # config.py
 db_config = {
-    'host': 'your-render-mysql-service.internal-hostname.render.com', # <-- THIS IS THE KEY CHANGE!
-    'user': 'your_render_db_user',
-    'password': 'your_render_db_password',
-    'database': 'landbank', # Or whatever database name Render provides/you chose
-    'port': 3306 # Usually 3306, but confirm
+    'host': 'dpg-d0sujere5dus73bk11d0-a', # e.g., 'dpg-abcdefg.oregon-postgres.render.com'
+    'port': 5432,                             # e.g., 5432
+    'database': 'landbank',        # e.g., 'landbank' or 'your_username'
+    'user': 'root',        # e.g., 'render_user'
+    'password': 'QkyqIQZkaTOEJDWHaHtOUudTxKyxIKr2'     # Your actual password
 }
