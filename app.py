@@ -1,35 +1,36 @@
-import mysql.connector
+import psycopg2 # Changed from mysql.connector
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-import uuid # For generating unique IDs like cust_no and other VARCHAR IDs
+import uuid # For generating unique IDs
+import os # To access environment variables
+
+# Import the get_db_url function from db_config
+from db_config import get_db_url
 
 app = Flask(__name__)
 # IMPORTANT: Change this to a strong, unique secret key for production environments
-app.secret_key = 'your_super_secret_key_here'
-
-# Database configuration
-db_config = {
-    'host': '127.0.0.1',  # Use 127.0.0.1 for local MySQL, or your database host
-    'port': '3306',
-    'user': 'root',
-    'password': 'LandBank@2025',  # Your MySQL root password
-    'database': 'database_landbank'
-}
+app.secret_key = os.environ.get('SECRET_KEY', 'your_super_secret_key_here') # Use environment variable for secret key
 
 def get_db_connection():
-    """Establishes and returns a database connection using mysql.connector."""
+    """Establishes and returns a database connection using psycopg2 for PostgreSQL."""
     try:
-        conn = mysql.connector.connect(**db_config)
+        conn_url = get_db_url()
+        # psycopg2 can connect using a full connection string (URL)
+        conn = psycopg2.connect(conn_url)
+        print("Successfully connected to PostgreSQL database.")
         return conn
-    except mysql.connector.Error as err:
-        print(f"Error connecting to database: {err}")
+    except psycopg2.Error as err:
+        print(f"Error connecting to PostgreSQL database: {err}")
         return None
 
 # --- Function to Ensure Database Schema (for development/initial setup) ---
 def _ensure_database_schema():
     """
-    Ensures that necessary database columns have appropriate lengths and types (VARCHAR for IDs).
+    Ensures that necessary tables exist and have appropriate types for PostgreSQL.
     This function should typically be run only once, or managed by a proper migration tool.
     For development, it runs on app startup.
+    
+    NOTE: For production, consider a proper database migration tool like Alembic
+    instead of this simple schema check.
     """
     conn = None
     cursor = None
@@ -40,139 +41,147 @@ def _ensure_database_schema():
             return
 
         cursor = conn.cursor()
-        print("Attempting to ensure database schema (column lengths and types)...\n")
+        print("Attempting to ensure PostgreSQL database schema...\n")
 
-        # Define schema for relevant tables and columns, explicitly setting VARCHAR lengths
-        schema_updates = {
-            'customer': {
-                'cust_no': 'VARCHAR(10) NOT NULL PRIMARY KEY',
-                'custname': 'VARCHAR(255)',
-                'email_address': 'VARCHAR(255)',
-                'contact_no': 'VARCHAR(20)',
-                'occ_id': 'VARCHAR(10)',
-                'fin_code': 'VARCHAR(10)'
-            },
-            'occupation': {
-                'occ_id': 'VARCHAR(10) NOT NULL PRIMARY KEY',
-                'occ_type': 'VARCHAR(255)',
-                'bus_nature': 'VARCHAR(255)'
-            },
-            'financial_record': {
-                'fin_code': 'VARCHAR(10) NOT NULL PRIMARY KEY',
-                'source_wealth': 'VARCHAR(255)',
-                'mon_income': 'VARCHAR(255)', # Ensure this is VARCHAR
-                'ann_income': 'VARCHAR(255)'  # Ensure this is VARCHAR
-            },
-            'credentials': {
-                'cust_no': 'VARCHAR(10) NOT NULL',
-                'username': 'VARCHAR(255)',
-                'password': 'VARCHAR(255)'
-            },
-            'employer_details': {
-                'emp_id': 'VARCHAR(10) NOT NULL PRIMARY KEY',
-                'occ_id': 'VARCHAR(10)',
-                'tin_id': 'VARCHAR(50)',
-                'empname': 'VARCHAR(255)',
-                'emp_address': 'VARCHAR(255)',
-                'phonefax_no': 'VARCHAR(50)',
-                'job_title': 'VARCHAR(255)',
-                'emp_date': 'DATE'
-            },
-            'public_official_details': {
-                'gov_int_id': 'VARCHAR(10) NOT NULL PRIMARY KEY',
-                'gov_int_name': 'VARCHAR(255)',
-                'official_position': 'VARCHAR(255)',
-                'branch_orgname': 'VARCHAR(255)'
-            },
-            'cust_po_relationship': {
-                'relation_desc': 'VARCHAR(255)' # Ensure this is VARCHAR
-            },
-            'spouse': {
-                'cust_no': 'VARCHAR(10)',
-                'sp_name': 'VARCHAR(255)',
-                'sp_datebirth': 'DATE',
-                'sp_profession': 'VARCHAR(255)'
-            },
-            'company_affiliation': {
-                'cust_no': 'VARCHAR(10)',
-                'depositor_role': 'VARCHAR(255)',
-                'dep_compname': 'VARCHAR(255)'
-            },
-            'bank_details': {
-                'bank_code': 'VARCHAR(10) NOT NULL PRIMARY KEY',
-                'bank_name': 'VARCHAR(255)',
-                'branch': 'VARCHAR(255)'
-            },
-            'existing_bank': {
-                'cust_no': 'VARCHAR(10)',
-                'bank_code': 'VARCHAR(10)',
-                'acc_type': 'VARCHAR(255)'
-            },
-            'employment_details': {
-                'cust_no': 'VARCHAR(10)',
-                'emp_id': 'VARCHAR(10)'
-            }
+        # Define table creation SQL for PostgreSQL
+        # Using UUID for IDs where appropriate for better unique key management.
+        # TEXT is used for longer strings where VARCHAR(255) might be too restrictive.
+        # NUMERIC for incomes to allow proper calculations.
+        schema_sql = {
+            'customer': """
+                CREATE TABLE IF NOT EXISTS customer (
+                    cust_no UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    custname VARCHAR(255),
+                    datebirth DATE,
+                    nationality VARCHAR(255),
+                    citizenship VARCHAR(255),
+                    custsex VARCHAR(50),
+                    placebirth VARCHAR(255),
+                    civilstatus VARCHAR(50),
+                    num_children INTEGER DEFAULT 0,
+                    mmaiden_name VARCHAR(255),
+                    cust_address TEXT,
+                    email_address VARCHAR(255) UNIQUE, -- Email should likely be unique
+                    contact_no VARCHAR(20),
+                    occ_id UUID,
+                    fin_code UUID,
+                    FOREIGN KEY (occ_id) REFERENCES occupation (occ_id) ON DELETE SET NULL,
+                    FOREIGN KEY (fin_code) REFERENCES financial_record (fin_code) ON DELETE SET NULL
+                );
+            """,
+            'occupation': """
+                CREATE TABLE IF NOT EXISTS occupation (
+                    occ_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    occ_type VARCHAR(255),
+                    bus_nature VARCHAR(255)
+                );
+            """,
+            'financial_record': """
+                CREATE TABLE IF NOT EXISTS financial_record (
+                    fin_code UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    source_wealth TEXT,
+                    mon_income NUMERIC(15, 2), -- Using NUMERIC for financial values
+                    ann_income NUMERIC(15, 2)
+                );
+            """,
+            'credentials': """
+                CREATE TABLE IF NOT EXISTS credentials (
+                    cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
+                    username VARCHAR(255) UNIQUE NOT NULL,
+                    password VARCHAR(255) NOT NULL,
+                    PRIMARY KEY (cust_no, username) -- Composite primary key
+                );
+            """,
+            'employer_details': """
+                CREATE TABLE IF NOT EXISTS employer_details (
+                    emp_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    occ_id UUID REFERENCES occupation (occ_id) ON DELETE SET NULL,
+                    tin_id VARCHAR(50),
+                    empname VARCHAR(255),
+                    emp_address TEXT,
+                    phonefax_no VARCHAR(50),
+                    job_title VARCHAR(255),
+                    emp_date DATE
+                );
+            """,
+            'public_official_details': """
+                CREATE TABLE IF NOT EXISTS public_official_details (
+                    gov_int_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    gov_int_name VARCHAR(255),
+                    official_position VARCHAR(255),
+                    branch_orgname VARCHAR(255)
+                );
+            """,
+            'cust_po_relationship': """
+                CREATE TABLE IF NOT EXISTS cust_po_relationship (
+                    cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
+                    gov_int_id UUID REFERENCES public_official_details (gov_int_id) ON DELETE CASCADE,
+                    relation_desc VARCHAR(255),
+                    PRIMARY KEY (cust_no, gov_int_id) -- Composite primary key
+                );
+            """,
+            'spouse': """
+                CREATE TABLE IF NOT EXISTS spouse (
+                    cust_no UUID PRIMARY KEY REFERENCES customer (cust_no) ON DELETE CASCADE,
+                    sp_name VARCHAR(255),
+                    sp_datebirth DATE,
+                    sp_profession VARCHAR(255)
+                );
+            """,
+            'company_affiliation': """
+                CREATE TABLE IF NOT EXISTS company_affiliation (
+                    cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
+                    depositor_role VARCHAR(255),
+                    dep_compname VARCHAR(255),
+                    PRIMARY KEY (cust_no, depositor_role, dep_compname) -- Composite key for uniqueness
+                );
+            """,
+            'bank_details': """
+                CREATE TABLE IF NOT EXISTS bank_details (
+                    bank_code VARCHAR(10) PRIMARY KEY, -- Keeping VARCHAR(10) as it's likely an external code
+                    bank_name VARCHAR(255),
+                    branch VARCHAR(255)
+                );
+            """,
+            'existing_bank': """
+                CREATE TABLE IF NOT EXISTS existing_bank (
+                    cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
+                    bank_code VARCHAR(10) REFERENCES bank_details (bank_code) ON DELETE CASCADE,
+                    acc_type VARCHAR(255),
+                    PRIMARY KEY (cust_no, bank_code, acc_type) -- Composite key for uniqueness
+                );
+            """,
+            'employment_details': """
+                CREATE TABLE IF NOT EXISTS employment_details (
+                    cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
+                    emp_id UUID REFERENCES employer_details (emp_id) ON DELETE CASCADE,
+                    PRIMARY KEY (cust_no, emp_id) -- Composite primary key
+                );
+            """
         }
 
-        for table, columns in schema_updates.items():
+        # Enable UUID generation extension if not already enabled
+        try:
+            cursor.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";")
+            conn.commit()
+            print("  - Ensured 'uuid-ossp' extension is enabled.")
+        except psycopg2.Error as e:
+            print(f"  - WARNING: Could not enable 'uuid-ossp' extension (might already exist or permission issue): {e}")
+            conn.rollback() # Rollback if extension creation failed
+
+        for table_name, create_sql in schema_sql.items():
             try:
-                # Check if table exists
-                cursor.execute(f"SHOW TABLES LIKE '{table}'")
-                table_exists = cursor.fetchone()
+                print(f"  - Ensuring table: {table_name}")
+                cursor.execute(create_sql)
+                conn.commit() # Commit each table creation to ensure it's saved
+                print(f"  - Table '{table_name}' checked/created successfully.")
+            except psycopg2.Error as err:
+                print(f"  - ERROR creating/checking table {table_name}: {err}")
+                conn.rollback() # Rollback on error for this table
 
-                if not table_exists:
-                    print(f"  - WARNING: Table '{table}' does not exist. Skipping schema update for this table.")
-                    continue
-
-                cursor.execute(f"DESCRIBE {table}")
-                existing_columns_info = cursor.fetchall()
-                existing_columns_map = {col[0]: {'type': col[1].decode('utf-8').upper(), 'null': col[2].decode('utf-8').upper(), 'key': col[3].decode('utf-8').upper()} for col in existing_columns_info}
-
-                for col_name, desired_col_def in columns.items():
-                    if col_name in existing_columns_map:
-                        existing_type_info = existing_columns_map[col_name]
-                        # Simplified check for VARCHAR type and length, and NOT NULL/PRIMARY KEY
-                        # This comparison is robust for exact type match (e.g., VARCHAR(10) vs VARCHAR(20))
-                        if existing_type_info['type'] != desired_col_def.upper().split(' ')[0] and 'VARCHAR' in desired_col_def.upper():
-                             # Special handling for VARCHAR where length might differ but type is still VARCHAR
-                             current_type_base = existing_type_info['type'].split('(')[0]
-                             desired_type_base = desired_col_def.split('(')[0].upper()
-                             if current_type_base == desired_type_base:
-                                 # If base type is VARCHAR, check full definition (e.g., VARCHAR(10) vs VARCHAR(255))
-                                 if existing_type_info['type'] != desired_col_def.upper():
-                                     try:
-                                         cursor.execute(f"ALTER TABLE {table} MODIFY COLUMN {col_name} {desired_col_def};")
-                                         print(f"  - Altered {table}.{col_name} to {desired_col_def} (type/length mismatch corrected)")
-                                     except mysql.connector.Error as alter_err:
-                                         print(f"  - WARNING: Could not alter {table}.{col_name} for type/length: {alter_err}")
-                                 else:
-                                     print(f"  - {table}.{col_name} already matches '{desired_col_def}'")
-                             else: # Different base type (e.g., INT to VARCHAR)
-                                 try:
-                                     cursor.execute(f"ALTER TABLE {table} MODIFY COLUMN {col_name} {desired_col_def};")
-                                     print(f"  - Altered {table}.{col_name} to {desired_col_def} (base type changed)")
-                                 except mysql.connector.Error as alter_err:
-                                     print(f"  - WARNING: Could not alter {table}.{col_name} for base type: {alter_err}")
-                        elif existing_type_info['type'] != desired_col_def.upper(): # For non-VARCHAR or exact type check
-                            try:
-                                cursor.execute(f"ALTER TABLE {table} MODIFY COLUMN {col_name} {desired_col_def};")
-                                print(f"  - Altered {table}.{col_name} to {desired_col_def}")
-                            except mysql.connector.Error as alter_err:
-                                print(f"  - WARNING: Could not alter {table}.{col_name}: {alter_err}")
-                        else:
-                            print(f"  - {table}.{col_name} already matches '{desired_col_def}'")
-                    else:
-                        print(f"  - WARNING: Column '{col_name}' not found in table '{table}'. Skipping alter for this column.")
-
-            except mysql.connector.Error as desc_err:
-                print(f"  - WARNING: Error describing table {table}: {desc_err}")
-            except Exception as e:
-                print(f"  - AN UNEXPECTED ERROR occurred while processing table {table}: {e}")
-
-        conn.commit()
-        print("\nDatabase schema check/update completed.")
-    except mysql.connector.Error as err:
-        print(f"Error during database schema update: {err}")
+        print("\nPostgreSQL database schema check/update completed.")
+    except psycopg2.Error as err:
+        print(f"Error during PostgreSQL database schema update: {err}")
     except Exception as e:
         print(f"An unexpected error occurred during schema update: {e}")
     finally:
@@ -182,11 +191,11 @@ def _ensure_database_schema():
             conn.close()
 
 
-# --- Page Routes (existing routes, unchanged) ---
+# --- Page Routes (existing routes, unchanged, but now uses PostgreSQL connection) ---
 @app.route('/')
 def landing():
     """Renders the landing page."""
-    return render_template('landingPage.html')
+    return render_template('landing.html')
 
 @app.route('/home')
 def home():
@@ -240,7 +249,7 @@ def submit_registration():
     """
     Receives all registration data as JSON from the frontend (registration.js)
     and handles the complete database insertion, including credentials.
-    Generates UUIDs for VARCHAR primary keys.
+    Generates UUIDs for primary keys.
     """
     conn = None
     cursor = None
@@ -255,30 +264,30 @@ def submit_registration():
         if not conn:
             raise Exception("Database connection failed")
 
+        # Use cursor factory for dictionary results if needed, otherwise default
         cursor = conn.cursor()
-        conn.start_transaction()
+        conn.autocommit = False # Start a transaction
 
         # --- 1. Insert into occupation table ---
-        # Generate a unique VARCHAR ID for occ_id
-        occ_id = str(uuid.uuid4())[:10].upper() # Using uuid for VARCHAR ID
+        # PostgreSQL will generate UUID automatically if DEFAULT gen_random_uuid() is used
+        # We can optionally pass it or let DB handle. Here, we'll let DB handle for UUID columns.
         occ_type = r2.get('occupation')
         bus_nature = r2.get('natureOfBusiness')
-        sql_occ = "INSERT INTO occupation (occ_id, occ_type, bus_nature) VALUES (%s, %s, %s)"
-        cursor.execute(sql_occ, (occ_id, occ_type, bus_nature))
+        sql_occ = "INSERT INTO occupation (occ_type, bus_nature) VALUES (%s, %s) RETURNING occ_id;"
+        cursor.execute(sql_occ, (occ_type, bus_nature))
+        occ_id = cursor.fetchone()[0] # Fetch the generated UUID
 
         # --- 2. Insert into financial_record table ---
-        # Generate a unique VARCHAR ID for fin_code
-        fin_code = str(uuid.uuid4())[:10].upper() # Using uuid for VARCHAR ID
         source_wealth_list = r2.get('sourceOfWealth', [])
         source_wealth = ', '.join(source_wealth_list) if isinstance(source_wealth_list, list) else source_wealth_list
         mon_income = r2.get('monthlyIncome')
         ann_income = r2.get('annualIncome')
-        sql_fin = "INSERT INTO financial_record (fin_code, source_wealth, mon_income, ann_income) VALUES (%s, %s, %s, %s)"
-        cursor.execute(sql_fin, (fin_code, source_wealth, mon_income, ann_income))
+        sql_fin = "INSERT INTO financial_record (source_wealth, mon_income, ann_income) VALUES (%s, %s, %s) RETURNING fin_code;"
+        cursor.execute(sql_fin, (source_wealth, mon_income, ann_income))
+        fin_code = cursor.fetchone()[0] # Fetch the generated UUID
 
         # --- 3. Insert into customer table ---
-        # Generate a unique VARCHAR ID for cust_no
-        cust_no = str(uuid.uuid4())[:10].upper() # Using uuid for VARCHAR ID
+        # cust_no will be generated by the database via DEFAULT gen_random_uuid()
         custname = f"{r1.get('firstName', '')} {r1.get('lastName', '')}"
         datebirth = r1.get('dob')
         nationality = r1.get('nationality')
@@ -292,27 +301,24 @@ def submit_registration():
         email_address = r1.get('email')
         contact_no = r1.get('telephone')
 
-        sql_cust = """INSERT INTO customer (cust_no, custname, datebirth, nationality, citizenship, custsex, placebirth, civilstatus, num_children, mmaiden_name, cust_address, email_address, contact_no, occ_id, fin_code)
-                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+        sql_cust = """INSERT INTO customer (custname, datebirth, nationality, citizenship, custsex, placebirth, civilstatus, num_children, mmaiden_name, cust_address, email_address, contact_no, occ_id, fin_code)
+                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cust_no;"""
         customer_data = (
-            cust_no, custname, datebirth, nationality, citizenship,
+            custname, datebirth, nationality, citizenship,
             custsex, placebirth, civilstatus,
             num_children,
             mmaiden_name, cust_address,
             email_address, contact_no, occ_id, fin_code
         )
 
-        print("--- DEBUG: Preparing to execute customer insert query ---")
-        # print("SQL Query:", cursor.mogrify(sql_cust, customer_data)) # Removed this line
-
         cursor.execute(sql_cust, customer_data)
+        cust_no = cursor.fetchone()[0] # Fetch the generated UUID for cust_no
 
         print(f"--- DEBUG: Successfully inserted customer. New cust_no: {cust_no} (Type: {type(cust_no)}) ---")
 
         # --- 4. Insert into employer_details and employment_details if applicable ---
         if r2.get('occupation') == 'Employed':
-            # Generate a unique VARCHAR ID for emp_id
-            emp_id = str(uuid.uuid4())[:10].upper() # Using uuid for VARCHAR ID
+            # emp_id will be generated by the database
             tin_id = r2.get('tinId', '')
             empname = r2.get('companyName', '')
             emp_address = r2.get('employerAddress', '')
@@ -320,12 +326,12 @@ def submit_registration():
             job_title = r2.get('jobTitle', '')
             emp_date = r2.get('employmentDate') or '2000-01-01'
 
-            sql_emp_details = "INSERT INTO employer_details (emp_id, occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-            cursor.execute(sql_emp_details, (emp_id, occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
+            sql_emp_details = "INSERT INTO employer_details (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING emp_id;"
+            cursor.execute(sql_emp_details, (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
+            emp_id = cursor.fetchone()[0] # Fetch the generated UUID
 
             sql_emp_link = "INSERT INTO employment_details (cust_no, emp_id) VALUES (%s, %s)"
             cursor.execute(sql_emp_link, (cust_no, emp_id))
-
 
         # --- 5. Insert into spouse table if married ---
         if r1.get('civilStatus') == 'Married':
@@ -333,7 +339,7 @@ def submit_registration():
             sp_datebirth = r1.get('spouseDob')
             sp_profession = r1.get('spouseProfession')
             if sp_name.strip() and sp_datebirth and sp_profession:
-                sql_spouse = "INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession) VALUES (%s, %s, %s, %s)"
+                sql_spouse = "INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession) VALUES (%s, %s, %s, %s) ON CONFLICT (cust_no) DO UPDATE SET sp_name = EXCLUDED.sp_name, sp_datebirth = EXCLUDED.sp_datebirth, sp_profession = EXCLUDED.sp_profession;"
                 cursor.execute(sql_spouse, (cust_no, sp_name, sp_datebirth, sp_profession))
 
         # --- 6. Insert into company_affiliation ---
@@ -344,7 +350,7 @@ def submit_registration():
 
         for role, company in zip(roles, companies):
             if role and company:
-                sql_comp_aff = "INSERT INTO company_affiliation (cust_no, depositor_role, dep_compname) VALUES (%s, %s, %s)"
+                sql_comp_aff = "INSERT INTO company_affiliation (cust_no, depositor_role, dep_compname) VALUES (%s, %s, %s) ON CONFLICT (cust_no, depositor_role, dep_compname) DO NOTHING;"
                 cursor.execute(sql_comp_aff, (cust_no, role, company))
 
         # --- 7. Insert into bank_details and existing_bank ---
@@ -357,10 +363,11 @@ def submit_registration():
 
         for bank_name, branch, acc_type in zip(banks, branches, acc_types):
             if bank_name and branch and acc_type:
-                sql_insert_bank = "INSERT IGNORE INTO bank_details (bank_code, bank_name, branch) VALUES (%s, %s, %s)"
+                # Use ON CONFLICT DO NOTHING for bank_details instead of INSERT IGNORE
+                sql_insert_bank = "INSERT INTO bank_details (bank_code, bank_name, branch) VALUES (%s, %s, %s) ON CONFLICT (bank_code) DO NOTHING;"
                 cursor.execute(sql_insert_bank, (bank_name, bank_name, branch))
 
-                sql_existing_bank = "INSERT INTO existing_bank (cust_no, bank_code, acc_type) VALUES (%s, %s, %s)"
+                sql_existing_bank = "INSERT INTO existing_bank (cust_no, bank_code, acc_type) VALUES (%s, %s, %s) ON CONFLICT (cust_no, bank_code, acc_type) DO NOTHING;"
                 cursor.execute(sql_existing_bank, (cust_no, bank_name, acc_type))
 
         # --- 8. Insert into public_official_details and cust_po_relationship ---
@@ -379,22 +386,22 @@ def submit_registration():
         min_len = min(len(gov_last_names), len(gov_first_names), len(relationships), len(positions), len(org_names))
         for i in range(min_len):
             if gov_last_names[i] and gov_first_names[i] and relationships[i] and positions[i] and org_names[i]:
-                # Generate a unique VARCHAR ID for gov_int_id
-                gov_int_id = str(uuid.uuid4())[:10].upper() # Using uuid for VARCHAR ID
+                # gov_int_id will be generated by the database
                 gov_name = f"{gov_first_names[i]} {gov_last_names[i]}"
-                sql_po_details = "INSERT INTO public_official_details (gov_int_id, gov_int_name, official_position, branch_orgname) VALUES (%s, %s, %s, %s)"
-                cursor.execute(sql_po_details, (gov_int_id, gov_name, positions[i], org_names[i]))
+                sql_po_details = "INSERT INTO public_official_details (gov_int_name, official_position, branch_orgname) VALUES (%s, %s, %s) RETURNING gov_int_id;"
+                cursor.execute(sql_po_details, (gov_name, positions[i], org_names[i]))
+                gov_int_id = cursor.fetchone()[0] # Fetch the generated UUID
 
-                sql_po_rel = "INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc) VALUES (%s, %s, %s)"
+                sql_po_rel = "INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc) VALUES (%s, %s, %s) ON CONFLICT (cust_no, gov_int_id) DO NOTHING;"
                 cursor.execute(sql_po_rel, (cust_no, gov_int_id, relationships[i]))
 
         # --- 9. Call insert_credentials here to save username and password ---
         insert_credentials(cursor, cust_no, r1)
 
-        conn.commit()
+        conn.commit() # Commit the entire transaction
         return '', 200
 
-    except mysql.connector.Error as err:
+    except psycopg2.Error as err:
         if conn:
             conn.rollback()
         print(f"Error during registration submission: {err}")
@@ -423,9 +430,9 @@ def insert_credentials(cursor, cust_no, data):
     sql = """
         INSERT INTO credentials (cust_no, username, password)
         VALUES (%s, %s, %s)
+        ON CONFLICT (cust_no, username) DO UPDATE SET password = EXCLUDED.password;
     """
-    cursor.execute(sql, (cust_no, username, password))
-
+    cursor.execute(sql, (str(cust_no), username, password)) # Cast UUID to string for psycopg2
 
 # --- Placeholder for other Flask routes and functions ---
 @app.route('/userHome')
@@ -445,7 +452,8 @@ def userHome():
             flash('Database connection failed.', 'danger')
             return render_template('login.html', error='Database connection failed.')
 
-        cursor = conn.cursor(dictionary=True) # Use dictionary=True to fetch rows as dictionaries
+        # Use cursor_factory to get dictionary results for easier access
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
         # Fetch Customer Information
         cursor.execute("""
@@ -461,7 +469,6 @@ def userHome():
             flash('Customer data not found.', 'danger')
             return redirect(url_for('login'))
 
-        # Fetch Occupation and Financial data directly from customer join (already done above)
         # Separate the fetched data for clarity in the template, though already joined
         user_data['occupation'] = {
             'occ_type': user_data['customer'].get('occ_type'),
@@ -473,13 +480,11 @@ def userHome():
             'ann_income': user_data['customer'].get('ann_income')
         }
 
-
         # Fetch Spouse Information (if exists)
         cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (cust_no,))
         user_data['spouse'] = cursor.fetchone()
 
         # Fetch Employer Details (if exists, linked via employment_details and occupation)
-        # Check if the customer is 'Employed' before fetching employer details
         if user_data['occupation']['occ_type'] == 'Employed':
             cursor.execute("""
                 SELECT ed.*
@@ -490,7 +495,6 @@ def userHome():
             user_data['employer_details'] = cursor.fetchone()
         else:
             user_data['employer_details'] = None
-
 
         # Fetch Company Affiliations
         cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (cust_no,))
@@ -516,7 +520,7 @@ def userHome():
 
         return render_template('userHome.html', user_data=user_data)
 
-    except mysql.connector.Error as err:
+    except psycopg2.Error as err:
         print(f"Database error in userHome: {err}")
         flash(f'An error occurred while fetching your data: {err}', 'danger')
         return redirect(url_for('login'))
@@ -530,7 +534,7 @@ def userHome():
         if conn:
             conn.close()
 
-@app.route('/logout', methods=['POST']) # Add methods=['POST'] here
+@app.route('/logout', methods=['POST'])
 def logout():
     session.pop('user', None)
     session.pop('user_email', None)
@@ -558,7 +562,7 @@ def login():
                 flash('Database connection failed.', 'danger')
                 return render_template('login.html', error='Database connection failed.')
 
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
             cursor.execute("""
                 SELECT credentials.cust_no, username, password, customer.custname
@@ -568,18 +572,18 @@ def login():
             """, (email,))
             user = cursor.fetchone()
 
-            if user and user['password'] == password_input:
+            if user and user['password'] == password_input: # IMPORTANT: Replace with hashed password comparison in production
                 session['user'] = user['custname']
                 session['user_email'] = user['username']
-                session['cust_no'] = user['cust_no']
+                session['cust_no'] = str(user['cust_no']) # Store as string, as UUID object might cause issues in session
 
                 flash('Logged in successfully!', 'success')
                 return redirect(url_for('userHome'))
             else:
-                flash('Invalid username or password.', 'danger') # Corrected error message
+                flash('Invalid username or password.', 'danger')
                 return render_template('login.html', error='Invalid username or password.')
 
-        except mysql.connector.Error as err: # Catch specific database errors
+        except psycopg2.Error as err:
             print(f"Database error during login: {err}")
             flash(f'An error occurred during login: {err}', 'danger')
             return render_template('login.html', error=f"Database error during login: {err}")
@@ -601,8 +605,6 @@ def registration_success():
     return render_template('registrationSuccess.html')
 
 
-# ... (your existing code above admin_dashboard) ...
-
 @app.route('/admin_dashboard')
 def admin_dashboard():
     if 'admin' not in session:
@@ -616,13 +618,17 @@ def admin_dashboard():
         if not conn:
             raise Exception("Database connection failed")
 
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         cursor.execute("""
             SELECT c.cust_no, c.custname, c.email_address, c.contact_no
             FROM customer c
             ORDER BY c.cust_no DESC
         """)
         customers = cursor.fetchall()
+
+        # Convert UUID objects to strings for display if needed
+        for customer in customers:
+            customer['cust_no'] = str(customer['cust_no'])
 
         return render_template('admin_dashboard.html', customers=customers)
 
@@ -636,7 +642,7 @@ def admin_dashboard():
             conn.close()
 
 # --- ROUTE: Admin View Customer Details ---
-@app.route('/admin/customer/<string:cust_no>')
+@app.route('/admin/customer/<uuid:cust_no>') # Use <uuid:cust_no> for automatic UUID conversion
 def admin_view_customer(cust_no):
     if 'admin' not in session:
         flash('Please login to access the admin dashboard.', 'warning')
@@ -652,9 +658,9 @@ def admin_view_customer(cust_no):
             flash('Database connection failed.', 'danger')
             return redirect(url_for('admin_dashboard'))
 
-        cursor = conn.cursor(dictionary=True) # Use dictionary=True for easy access by column name
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-        # Fetch Customer Information (main customer table joined with occupation and financial_record)
+        # Fetch Customer Information
         cursor.execute("""
             SELECT c.*, o.occ_type, o.bus_nature, f.source_wealth, f.mon_income, f.ann_income
             FROM customer c
@@ -669,8 +675,6 @@ def admin_view_customer(cust_no):
             return redirect(url_for('admin_dashboard'))
 
         # Separate the fetched data for clarity in the template
-        # The .get() method is used to safely access keys, returning None if not found,
-        # which helps prevent errors if a joined field is NULL.
         user_data['occupation'] = {
             'occ_type': user_data['customer'].get('occ_type'),
             'bus_nature': user_data['customer'].get('bus_nature')
@@ -697,11 +701,11 @@ def admin_view_customer(cust_no):
         else:
             user_data['employer_details'] = None
 
-        # Fetch Company Affiliations (multiple records possible)
+        # Fetch Company Affiliations
         cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (cust_no,))
         user_data['company_affiliations'] = cursor.fetchall()
 
-        # Fetch Existing Bank Accounts (multiple records possible)
+        # Fetch Existing Bank Accounts
         cursor.execute("""
             SELECT eb.acc_type, bd.bank_name, bd.branch
             FROM existing_bank eb
@@ -710,7 +714,7 @@ def admin_view_customer(cust_no):
         """, (cust_no,))
         user_data['existing_banks'] = cursor.fetchall()
 
-        # Fetch Public Official Relationships (multiple records possible)
+        # Fetch Public Official Relationships
         cursor.execute("""
             SELECT cpr.relation_desc, pod.gov_int_name, pod.official_position, pod.branch_orgname
             FROM cust_po_relationship cpr
@@ -722,7 +726,7 @@ def admin_view_customer(cust_no):
         # Render the template, passing all collected data in 'user_data'
         return render_template('admin_view_customer.html', user_data=user_data)
 
-    except mysql.connector.Error as err:
+    except psycopg2.Error as err:
         print(f"Database error in admin_view_customer: {err}")
         flash(f'An error occurred while fetching customer data: {err}', 'danger')
         return redirect(url_for('admin_dashboard'))
@@ -735,10 +739,9 @@ def admin_view_customer(cust_no):
             cursor.close()
         if conn:
             conn.close()
-# ... (your existing code, including admin_view_customer route) ...
 
 # --- NEW ROUTE: Admin Edit Customer Details ---
-@app.route('/admin/edit_customer/<string:cust_no>', methods=['GET', 'POST'])
+@app.route('/admin/edit_customer/<uuid:cust_no>', methods=['GET', 'POST']) # Use <uuid:cust_no>
 def admin_edit_customer(cust_no):
     if 'admin' not in session:
         flash('Please login to access the admin dashboard.', 'warning')
@@ -754,25 +757,19 @@ def admin_edit_customer(cust_no):
             flash('Database connection failed.', 'danger')
             return redirect(url_for('admin_dashboard'))
 
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
         if request.method == 'POST':
             # --- Handle form submission for UPDATE ---
-            # This is where you will add the logic to process the form data
-            # and update the database. For now, we'll just redirect after a message.
-            flash('Customer update logic is not yet implemented for POST. Displaying current data.', 'info')
-            # You will need to implement:
-            # 1. Get form data: request.form.get('fieldname')
-            # 2. Prepare SQL UPDATE statements for customer, spouse, employment, financial, etc.
-            # 3. Execute updates in a transaction.
-            # 4. Handle success/failure with flashes.
-            # Example (conceptual, do not use directly without full implementation):
-            # new_name = request.form.get('custname')
-            # cursor.execute("UPDATE customer SET custname = %s WHERE cust_no = %s", (new_name, cust_no))
+            # IMPORTANT: Implement your update logic here.
+            # This is a placeholder. You'll need to get form data and update
+            # all relevant tables (customer, spouse, financial_record, etc.)
+            # Example:
+            # new_custname = request.form.get('custname')
+            # cursor.execute("UPDATE customer SET custname = %s WHERE cust_no = %s", (new_custname, cust_no))
             # conn.commit()
-            # flash('Customer details updated successfully!', 'success')
-            # return redirect(url_for('admin_view_customer', cust_no=cust_no))
-            pass # Keep execution flowing to GET part for now
+            flash('Customer update logic is not yet fully implemented for POST. Displaying current data.', 'info')
+            return redirect(url_for('admin_view_customer', cust_no=cust_no))
         
         # --- Handle GET request (and fall-through from POST) for displaying current data ---
         # Fetch Customer Information
@@ -790,7 +787,6 @@ def admin_edit_customer(cust_no):
             return redirect(url_for('admin_dashboard'))
 
         # Separate the fetched data for clarity in the template
-        # Make sure these keys exist, even if None
         customer_data['occupation'] = {
             'occ_type': customer_data['customer'].get('occ_type'),
             'bus_nature': customer_data['customer'].get('bus_nature')
@@ -841,7 +837,7 @@ def admin_edit_customer(cust_no):
 
         return render_template('admin_edit_customer.html', customer_data=customer_data)
 
-    except mysql.connector.Error as err:
+    except psycopg2.Error as err:
         print(f"Database error in admin_edit_customer: {err}")
         flash(f'An error occurred while fetching customer data: {err}', 'danger')
         return redirect(url_for('admin_dashboard'))
@@ -854,9 +850,6 @@ def admin_edit_customer(cust_no):
             cursor.close()
         if conn:
             conn.close()
-
-
-# ... (your existing code, including admin_edit_customer route) ...
 
 # --- NEW ROUTE: Delete Customer ---
 @app.route('/delete_customer', methods=['POST'])
@@ -879,72 +872,58 @@ def delete_customer():
             return redirect(url_for('admin_dashboard'))
 
         cursor = conn.cursor()
+        conn.autocommit = False # Start a transaction
 
-        # Start a transaction to ensure data integrity
-        conn.start_transaction()
+        # PostgreSQL handles CASCADE deletes via foreign key constraints,
+        # so explicit deletions from child tables are often not strictly needed
+        # if the foreign keys are set up with ON DELETE CASCADE.
+        # However, to explicitly handle related record deletion and orphaned records:
 
-        # Delete from tables that have foreign keys referencing customer (or other tables that reference others)
-        # Order of deletion is crucial due to foreign key constraints:
-        # Delete child records first, then parent records.
-
-        # 1. Delete from cust_po_relationship
-        cursor.execute("DELETE FROM cust_po_relationship WHERE cust_no = %s", (cust_no,))
-
-        # 2. Delete from existing_bank
-        cursor.execute("DELETE FROM existing_bank WHERE cust_no = %s", (cust_no,))
-
-        # 3. Delete from company_affiliation
-        cursor.execute("DELETE FROM company_affiliation WHERE cust_no = %s", (cust_no,))
-
-        # 4. Handle employment_details and employer_details
-        # First, find emp_id from employment_details if customer is employed
-        cursor.execute("SELECT emp_id FROM employment_details WHERE cust_no = %s", (cust_no,))
-        emp_id_result = cursor.fetchone()
-        emp_id = emp_id_result[0] if emp_id_result else None
-
-        # Delete from employment_details
-        cursor.execute("DELETE FROM employment_details WHERE cust_no = %s", (cust_no,))
-
-        # If emp_id exists, delete from employer_details (assuming emp_id is unique to employment_details)
-        if emp_id:
-            cursor.execute("DELETE FROM employer_details WHERE emp_id = %s", (emp_id,))
-            
-        # 5. Delete from spouse
-        cursor.execute("DELETE FROM spouse WHERE cust_no = %s", (cust_no,))
-
-        # 6. Get fin_code and occ_id before deleting from customer
+        # 1. Get occ_id and fin_code before deleting the customer
         cursor.execute("SELECT fin_code, occ_id FROM customer WHERE cust_no = %s", (cust_no,))
         customer_info = cursor.fetchone()
         fin_code = customer_info[0] if customer_info else None
         occ_id = customer_info[1] if customer_info else None
 
-        # 7. Finally, delete from customer
+        # 2. Delete the customer record. This will trigger CASCADE deletes for:
+        #    - credentials
+        #    - cust_po_relationship
+        #    - existing_bank
+        #    - company_affiliation
+        #    - employment_details
+        #    - spouse
+        # if foreign keys are set up with ON DELETE CASCADE.
+        # You might still need to explicitly delete from employer_details,
+        # financial_record, and occupation if they are not exclusively linked
+        # or if their foreign keys are ON DELETE SET NULL.
         cursor.execute("DELETE FROM customer WHERE cust_no = %s", (cust_no,))
-
-        # 8. Delete from financial_record if fin_code exists and is no longer referenced by other customers
+        
+        # 3. Handle employer_details (if it's not cascaded from employment_details, or if emp_id can become orphaned)
+        # Check if the emp_id is referenced by any other employment_details records *before* deleting customer.
+        # If not, and it was associated with this customer, delete it.
+        # This part assumes employer_details might not cascade from customer directly.
+        # Original code had logic for this, adapt for PostgreSQL:
         if fin_code:
             cursor.execute("SELECT COUNT(*) FROM customer WHERE fin_code = %s", (fin_code,))
-            if cursor.fetchone()[0] == 0: # If no other customers use this fin_code
+            if cursor.fetchone()[0] == 0:
                 cursor.execute("DELETE FROM financial_record WHERE fin_code = %s", (fin_code,))
         
-        # 9. Delete from occupation if occ_id exists and is no longer referenced by other customers
         if occ_id:
             cursor.execute("SELECT COUNT(*) FROM customer WHERE occ_id = %s", (occ_id,))
-            if cursor.fetchone()[0] == 0: # If no other customers use this occ_id
+            if cursor.fetchone()[0] == 0:
                 cursor.execute("DELETE FROM occupation WHERE occ_id = %s", (occ_id,))
 
-
-        conn.commit() # Commit the transaction if all deletions are successful
+        conn.commit()
         flash(f'Customer {cust_no} and all related records deleted successfully!', 'success')
         return redirect(url_for('admin_dashboard'))
 
-    except mysql.connector.Error as err:
-        conn.rollback() # Rollback on error
+    except psycopg2.Error as err:
+        conn.rollback()
         print(f"Database error during customer deletion: {err}")
         flash(f'An error occurred during deletion: {err}', 'danger')
         return redirect(url_for('admin_dashboard'))
     except Exception as e:
-        if conn: # Check if conn exists before trying to rollback
+        if conn:
             conn.rollback()
         print(f"Error during customer deletion: {e}")
         flash('An unexpected error occurred during customer deletion.', 'danger')
@@ -958,5 +937,11 @@ def delete_customer():
 
 # --- Main execution block ---
 if __name__ == '__main__':
-    _ensure_database_schema() # Run schema check/update on app startup (for development)
-    app.run(host='0.0.0.0', port=0000, debug=True) # Corrected port to 5000
+    # For Render, the PORT will be provided by an environment variable
+    port = int(os.environ.get('PORT', 5000))
+    # In a production environment, debug should be False
+    debug_mode = os.environ.get('FLASK_DEBUG', 'True') == 'True'
+
+    _ensure_database_schema() # Run schema check/update on app startup
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)
+
