@@ -10,54 +10,69 @@
   <style>
     body {
       font-family: 'Inter', sans-serif;
-      /* Dark green background from other admin templates' body/overlay */
-      background-color: #385E38;
+      background-color: #385E38; /* Dark green background */
       color: #fff; /* White text for general body content */
+      min-height: 100vh; /* Ensure body takes full viewport height */
+      display: flex; /* Use flexbox for centering content */
+      justify-content: center; /* Center horizontally */
+      align-items: flex-start; /* Align to the top, allowing content to flow down */
+      padding: 20px; /* Add some padding around the edges for smaller screens */
+      box-sizing: border-box; /* Include padding in the element's total width and height */
     }
     .container {
-      margin-top: 50px;
-      /* Semi-transparent white background, consistent with edit/view pages */
-      background-color: rgba(255, 255, 255, 0.1);
+      margin-top: 30px; /* Adjusted margin-top for better mobile appearance */
+      background-color: rgba(255, 255, 255, 0.1); /* Semi-transparent white background */
       padding: 30px;
-      border-radius: 10px; /* Slightly more rounded corners */
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.3); /* Stronger shadow */
-      margin-bottom: 50px; /* Space at bottom */
-      border: 1px solid rgba(255, 255, 255, 0.2); /* Subtle white border */
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+      margin-bottom: 30px; /* Consistent vertical spacing */
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      max-width: 960px; /* Max width for larger screens, keep it readable */
+      width: 100%; /* Ensure it takes full width on smaller screens */
     }
     .table {
-      color: #fff; /* White text for table content */
+      color: #fff;
     }
     .table th, .table td {
       vertical-align: middle;
-      border-color: rgba(255, 255, 255, 0.3); /* Lighter border for table cells */
+      border-color: rgba(255, 255, 255, 0.3);
     }
-    .table-dark { /* Specific style for table header */
-        background-color: rgba(0, 0, 0, 0.3); /* Slightly transparent dark background */
-        border-color: rgba(255, 255, 255, 0.3);
+    .table-dark {
+      background-color: rgba(0, 0, 0, 0.3);
+      border-color: rgba(255, 255, 255, 0.3);
     }
     .header {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 30px;
-      color: #fff; /* White text for header */
+      flex-direction: column; /* Stack header items on small screens */
+      align-items: flex-start; /* Align to start when stacked */
+      margin-bottom: 20px; /* Adjusted margin */
+      color: #fff;
       padding-bottom: 15px;
-      border-bottom: 1.5px solid rgba(255, 255, 255, 0.5); /* Lighter border */
+      border-bottom: 1.5px solid rgba(255, 255, 255, 0.5);
+    }
+    .header h2 {
+      margin-bottom: 15px; /* Space between title and logout button on small screens */
+      text-align: center; /* Center title when stacked */
+      width: 100%; /* Ensure title takes full width */
+    }
+    .header form {
+      width: 100%; /* Ensure logout form takes full width */
+      text-align: center; /* Center logout button */
     }
     h2, h4 {
-        color: #fff; /* White text for headings */
-        font-weight: bold; /* Make headings bold */
+        color: #fff;
+        font-weight: bold;
     }
     .btn-logout {
-      /* Consistent green button style */
       background: linear-gradient(to right, #00B86B, #008f53);
       color: #fff;
-      padding: 10px 20px; /* Adjust padding */
-      border-radius: 8px; /* Consistent border-radius */
+      padding: 10px 20px;
+      border-radius: 8px;
       font-weight: bold;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
       border: none;
       transition: all 0.3s ease;
+      width: auto; /* Allow button to size naturally */
     }
     .btn-logout:hover {
       background: linear-gradient(to right, #008f53, #00B86B);
@@ -65,60 +80,92 @@
       box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
     }
     .btn-action {
-        margin-right: 5px; /* Adds spacing between buttons */
-        padding: 8px 15px; /* Adjust padding for sm buttons */
-        border-radius: 8px; /* Consistent border-radius */
+        margin-right: 5px;
+        padding: 8px 15px;
+        border-radius: 8px;
         font-weight: bold;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         transition: all 0.3s ease;
+        /* Ensure touch target size is adequate */
+        min-width: 80px; /* A minimum width for better tapping */
+        text-align: center;
     }
     .btn-action:hover {
         transform: translateY(-1px);
         box-shadow: 0 3px 5px rgba(0, 0, 0, 0.2);
     }
-    /* Custom styles for view and edit buttons */
     .btn-view {
-        background: linear-gradient(to right, #17a2b8, #138496); /* Info blue, can be changed to green if preferred */
+        background: linear-gradient(to right, #17a2b8, #138496);
         color: white;
     }
     .btn-view:hover {
         background: linear-gradient(to right, #138496, #17a2b8);
     }
     .btn-edit {
-        background: linear-gradient(to right, #ffc107, #e0a800); /* Warning yellow, can be changed to green if preferred */
-        color: #212529; /* Darker text for better contrast */
+        background: linear-gradient(to right, #ffc107, #e0a800);
+        color: #212529;
     }
     .btn-edit:hover {
         background: linear-gradient(to right, #e0a800, #ffc107);
         color: #212529;
     }
     .btn-danger {
-        background: linear-gradient(to right, #dc3545, #c82333); /* Danger red */
-        color: white;
-    }
-    .btn-danger:hover {
-        background: linear: #c82333; /* Danger red */
+        background: linear-gradient(to right, #dc3545, #c82333);
         color: white;
     }
     .btn-danger:hover {
         background: linear-gradient(to right, #c82333, #dc3545);
     }
-    .text-center { /* Ensure text-center remains readable */
+    .text-center {
         color: #fff;
     }
-    /* Responsive table styles */
+
+    /* Responsive adjustments for smaller screens */
     @media (max-width: 768px) {
+        .header {
+            flex-direction: column; /* Stack elements vertically */
+            align-items: center; /* Center items when stacked */
+        }
+        .header h2, .header form {
+            width: 100%; /* Take full width */
+            text-align: center; /* Center content */
+        }
+        .header h2 {
+            margin-bottom: 15px; /* Add space below the title when stacked */
+        }
+
         .table-responsive {
-            overflow-x: auto; /* Enable horizontal scrolling for tables on small screens */
+            overflow-x: auto; /* Enable horizontal scrolling for tables */
             -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
         }
         .table th, .table td {
             white-space: nowrap; /* Prevent text wrapping in table cells */
+            padding: 8px; /* Slightly reduced padding for tighter fit */
         }
         .btn-action {
-            display: block; /* Stack buttons vertically on small screens */
-            width: 100%;
-            margin-bottom: 5px; /* Add vertical spacing */
+            display: block; /* Stack buttons vertically */
+            width: 100%; /* Make buttons take full width */
+            margin-right: 0; /* Remove horizontal margin */
+            margin-bottom: 8px; /* Add vertical spacing between stacked buttons */
+        }
+        .btn-action:last-child {
+            margin-bottom: 0; /* No margin below the last button in a stack */
+        }
+    }
+
+    /* Further refine for very small mobile devices (e.g., widths less than 480px) */
+    @media (max-width: 480px) {
+        .container {
+            padding: 20px; /* Reduce padding slightly */
+            margin-left: 10px; /* Small horizontal margin */
+            margin-right: 10px;
+        }
+        .btn-logout {
+            padding: 8px 15px; /* Smaller padding for logout button */
+        }
+        .btn-action {
+            padding: 6px 12px; /* Smaller padding for action buttons */
+            font-size: 0.9em; /* Smaller font size for action buttons */
         }
     }
   </style>
