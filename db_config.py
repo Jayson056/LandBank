@@ -4,10 +4,10 @@ import os
 # For Render, a DATABASE_URL environment variable will be used.
 # Make sure PostgreSQL is running locally and these credentials are correct.
 local_db_config = {
-    'host': 'dpg-d18mvf0gjchc739b8slg-a',
+    'host': 'dpg-d19tutemcj7s73ettva0-a',
     'port': '5432', # Default PostgreSQL port
     'user': 'database_landbank_user', # Default PostgreSQL user
-    'password': 'G7glMPn5QdMop7YdO6gLJZfoXX4o0vpe', # *** IMPORTANT: Change this to your actual PostgreSQL password ***
+    'password': 'Oky6pZH3n8lBnaAbx9iQodLpWRwF3XIo', # *** IMPORTANT: Change this to your actual PostgreSQL password ***
     'database': 'database_landbank'
 }
 
