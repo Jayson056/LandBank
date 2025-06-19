@@ -39,6 +39,7 @@ def _ensure_database_schema():
             return
 
         cursor = conn.cursor()
+        conn.autocommit = True # Set to True for schema operations outside of explicit transactions
         print("Attempting to ensure PostgreSQL database schema...\n")
 
         # Define table creation SQL for PostgreSQL
@@ -56,13 +57,13 @@ def _ensure_database_schema():
                 CREATE TABLE IF NOT EXISTS financial_record (
                     fin_code UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     source_wealth TEXT,
-                    mon_income TEXT, -- Intended type to match frontend string inputs like "30000_and_below"
-                    ann_income TEXT -- Intended type to match frontend string inputs
+                    mon_income TEXT, 
+                    ann_income TEXT 
                 );
             """,
             'bank_details': """
                 CREATE TABLE IF NOT EXISTS bank_details (
-                    bank_code VARCHAR(10) PRIMARY KEY, -- Keeping VARCHAR(10) as it's likely an external code
+                    bank_code VARCHAR(10) PRIMARY KEY, 
                     bank_name VARCHAR(255),
                     branch VARCHAR(255)
                 );
@@ -88,11 +89,11 @@ def _ensure_database_schema():
                     num_children INTEGER DEFAULT 0,
                     mmaiden_name VARCHAR(255),
                     cust_address TEXT,
-                    email_address VARCHAR(255) UNIQUE, -- Email should likely be unique
+                    email_address VARCHAR(255) UNIQUE, 
                     contact_no VARCHAR(20),
                     occ_id UUID,
                     fin_code UUID,
-                    registration_status VARCHAR(50) DEFAULT 'Pending', -- NEW COLUMN
+                    registration_status VARCHAR(50) DEFAULT 'Pending', 
                     FOREIGN KEY (occ_id) REFERENCES occupation (occ_id) ON DELETE SET NULL,
                     FOREIGN KEY (fin_code) REFERENCES financial_record (fin_code) ON DELETE SET NULL
                 );
@@ -114,7 +115,7 @@ def _ensure_database_schema():
                     cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
                     username VARCHAR(255) UNIQUE NOT NULL,
                     password VARCHAR(255) NOT NULL,
-                    PRIMARY KEY (cust_no, username) # Composite primary key
+                    PRIMARY KEY (cust_no, username) 
                 );
             """,
             'spouse': """
@@ -130,7 +131,7 @@ def _ensure_database_schema():
                     cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
                     depositor_role VARCHAR(255),
                     dep_compname VARCHAR(255),
-                    PRIMARY KEY (cust_no, depositor_role, dep_compname) # Composite key for uniqueness
+                    PRIMARY KEY (cust_no, depositor_role, dep_compname) 
                 );
             """,
             'existing_bank': """
@@ -138,7 +139,7 @@ def _ensure_database_schema():
                     cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
                     bank_code VARCHAR(10) REFERENCES bank_details (bank_code) ON DELETE CASCADE,
                     acc_type VARCHAR(255),
-                    PRIMARY KEY (cust_no, bank_code, acc_type) # Composite key for uniqueness
+                    PRIMARY KEY (cust_no, bank_code, acc_type) 
                 );
             """,
             'cust_po_relationship': """
@@ -146,14 +147,14 @@ def _ensure_database_schema():
                     cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
                     gov_int_id UUID REFERENCES public_official_details (gov_int_id) ON DELETE CASCADE,
                     relation_desc VARCHAR(255),
-                    PRIMARY KEY (cust_no, gov_int_id) # Composite primary key
+                    PRIMARY KEY (cust_no, gov_int_id) 
                 );
             """,
             'employment_details': """
                 CREATE TABLE IF NOT EXISTS employment_details (
                     cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
                     emp_id UUID REFERENCES employer_details (emp_id) ON DELETE CASCADE,
-                    PRIMARY KEY (cust_no, emp_id) # Composite primary key
+                    PRIMARY KEY (cust_no, emp_id) 
                 );
             """
         }
@@ -165,17 +166,17 @@ def _ensure_database_schema():
             print("  - Ensured 'uuid-ossp' extension is enabled.")
         except psycopg2.Error as e:
             print(f"  - WARNING: Could not enable 'uuid-ossp' extension (might already exist or permission issue): {e}")
-            conn.rollback() # Rollback if extension creation failed
+            conn.rollback() 
 
         for table_name, create_sql in schema_sql.items():
             try:
                 print(f"  - Ensuring table: {table_name}")
                 cursor.execute(create_sql)
-                conn.commit() # Commit each table creation to ensure it's saved
+                conn.commit() 
                 print(f"  - Table '{table_name}' checked/created successfully.")
             except psycopg2.Error as err:
                 print(f"  - ERROR creating/checking table {table_name}: {err}")
-                conn.rollback() # Rollback on error for this table
+                conn.rollback() 
         
         # --- ALTER TABLE LOGIC (for financial_record income types and customer status) ---
         try:
@@ -370,8 +371,10 @@ def submit_registration():
             empname = r2.get('companyName', '')
             emp_address = r2.get('employerAddress', '')
             phonefax_no = r2.get('employerPhone', '')
+            emp_date_str = r2.get('employmentDate') 
+            emp_date = emp_date_str if emp_date_str else None # Handle empty date string
             job_title = r2.get('jobTitle', '')
-            emp_date = r2.get('employmentDate') or '2000-01-01'
+
 
             sql_emp_details = "INSERT INTO employer_details (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING emp_id;"
             cursor.execute(sql_emp_details, (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
@@ -383,9 +386,10 @@ def submit_registration():
         # --- 5. Insert into spouse table if married ---
         if r1.get('civilStatus') == 'Married':
             sp_name = f"{r1.get('spouseFirstName', '')} {r1.get('spouseLastName', '')}"
-            sp_datebirth = r1.get('spouseDob')
+            sp_datebirth_str = r1.get('spouseDob')
+            sp_datebirth = sp_datebirth_str if sp_datebirth_str else None # Handle empty date string
             sp_profession = r1.get('spouseProfession')
-            if sp_name.strip() and sp_datebirth and sp_profession:
+            if sp_name.strip() and sp_profession and sp_datebirth: # Only insert if all spouse fields are non-empty
                 sql_spouse = "INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession) VALUES (%s, %s, %s, %s) ON CONFLICT (cust_no) DO UPDATE SET sp_name = EXCLUDED.sp_name, sp_datebirth = EXCLUDED.sp_datebirth, sp_profession = EXCLUDED.sp_profession;"
                 cursor.execute(sql_spouse, (cust_no, sp_name, sp_datebirth, sp_profession))
 
@@ -432,11 +436,20 @@ def submit_registration():
 
         min_len = min(len(gov_last_names), len(gov_first_names), len(relationships), len(positions), len(org_names))
         for i in range(min_len):
+            # Only process if essential fields are not empty
             if gov_last_names[i] and gov_first_names[i] and relationships[i] and positions[i] and org_names[i]:
                 gov_name = f"{gov_first_names[i]} {gov_last_names[i]}"
-                sql_po_details = "INSERT INTO public_official_details (gov_int_name, official_position, branch_orgname) VALUES (%s, %s, %s) RETURNING gov_int_id;"
-                cursor.execute(sql_po_details, (gov_name, positions[i], org_names[i]))
-                gov_int_id = cursor.fetchone()[0] # Fetch the generated UUID
+                # Check if PO already exists to avoid duplicates
+                cursor.execute("SELECT gov_int_id FROM public_official_details WHERE gov_int_name = %s AND official_position = %s AND branch_orgname = %s;",
+                               (gov_name, positions[i], org_names[i]))
+                po_exists = cursor.fetchone()
+
+                if po_exists:
+                    gov_int_id = po_exists[0]
+                else:
+                    sql_po_details = "INSERT INTO public_official_details (gov_int_name, official_position, branch_orgname) VALUES (%s, %s, %s) RETURNING gov_int_id;"
+                    cursor.execute(sql_po_details, (gov_name, positions[i], org_names[i]))
+                    gov_int_id = cursor.fetchone()[0] # Fetch the generated UUID
 
                 sql_po_rel = "INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc) VALUES (%s, %s, %s) ON CONFLICT (cust_no, gov_int_id) DO NOTHING;"
                 cursor.execute(sql_po_rel, (cust_no, gov_int_id, relationships[i]))
@@ -676,8 +689,8 @@ def admin_dashboard():
 
         sql_query = """
             SELECT c.cust_no, c.custname, c.email_address, c.contact_no, 
-                   c.registration_status, -- Directly selecting from customer table
-                   CASE WHEN c.datebirth IS NOT NULL THEN c.datebirth ELSE NULL END AS registration_date
+                   c.registration_status, 
+                   c.datebirth AS registration_date -- Using datebirth as registration date
             FROM customer c
             WHERE 1=1
         """
@@ -692,27 +705,26 @@ def admin_dashboard():
             params.append(status_filter)
 
         if reg_date_filter:
-            sql_query += " AND c.datebirth = %s" # Assuming datebirth can act as registration_date
+            sql_query += " AND c.datebirth = %s" 
             params.append(reg_date_filter)
 
-        sql_query += " ORDER BY c.custname ASC" # Order by name for consistency
+        sql_query += " ORDER BY c.custname ASC" 
 
         cursor.execute(sql_query, params)
         customers = cursor.fetchall()
 
         # Convert UUID objects to strings for display in HTML template
-        for i, customer in enumerate(customers):
+        # And ensure 'status' key for consistency in rendering badges
+        processed_customers = []
+        for customer in customers:
             customer_dict = dict(customer) # Convert row to dictionary for modification
             customer_dict['cust_no'] = str(customer_dict['cust_no'])
-            # Ensure 'status' is present for display, using registration_status
             customer_dict['status'] = customer_dict.get('registration_status', 'Pending') 
-            # Format date for display if needed
             if customer_dict.get('registration_date'):
                 customer_dict['registration_date'] = customer_dict['registration_date'].strftime('%Y-%m-%d')
+            processed_customers.append(customer_dict)
 
-            customers[i] = customer_dict # Assign updated dict back
-
-        return render_template('admin_dashboard.html', customers=customers)
+        return render_template('admin_dashboard.html', customers=processed_customers)
 
     except psycopg2.Error as err:
         print(f"Database error in admin_dashboard: {err}")
@@ -752,7 +764,7 @@ def admin_add_customer():
 
         # --- Extract form data for Customer table ---
         custname = request.form.get('custname')
-        datebirth = request.form.get('datebirth')
+        datebirth = request.form.get('datebirth') or None # Handle empty date
         nationality = request.form.get('nationality')
         citizenship = request.form.get('citizenship')
         custsex = request.form.get('custsex')
@@ -763,7 +775,6 @@ def admin_add_customer():
         cust_address = request.form.get('cust_address')
         email_address = request.form.get('email_address')
         contact_no = request.form.get('contact_no')
-        # Default status for new customers added by admin
         registration_status = 'Active' 
 
         # --- Insert into Financial Record table ---
@@ -792,29 +803,29 @@ def admin_add_customer():
             email_address, contact_no, occ_id, fin_code, registration_status
         )
         cursor.execute(sql_cust, customer_data)
-        cust_no = cursor.fetchone()[0] # Get the newly generated cust_no
+        cust_no = cursor.fetchone()[0] 
 
         # --- Insert into Credentials table (using email as username, generate a simple password) ---
-        insert_credentials(cursor, cust_no, {'email': email_address}) # Reuse helper
+        insert_credentials(cursor, cust_no, {'email': email_address}) 
 
         # --- Insert into Spouse table (if married and data provided) ---
         sp_name = request.form.get('sp_name')
-        sp_datebirth = request.form.get('sp_datebirth')
+        sp_datebirth = request.form.get('sp_datebirth') or None # Handle empty date
         sp_profession = request.form.get('sp_profession')
-        if civilstatus == 'Married' and sp_name and sp_datebirth and sp_profession:
+        if civilstatus == 'Married' and sp_name and sp_profession and sp_datebirth:
             sql_spouse = "INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession) VALUES (%s, %s, %s, %s);"
             cursor.execute(sql_spouse, (str(cust_no), sp_name, sp_datebirth, sp_profession))
 
         # --- Insert into Employer Details and Employment Details if applicable ---
-        if occ_type == 'Employed': # Assuming 'Employed' matches the input from occ_type
+        if occ_type == 'Employed': 
             tin_id = request.form.get('tin_id')
             empname = request.form.get('empname')
             emp_address = request.form.get('emp_address')
             phonefax_no = request.form.get('phonefax_no')
             job_title = request.form.get('job_title')
-            emp_date = request.form.get('emp_date') or '2000-01-01' # Default if not provided
+            emp_date = request.form.get('emp_date') or None # Handle empty date
 
-            if empname: # Only insert if employer name is provided
+            if empname: 
                 sql_emp_details = "INSERT INTO employer_details (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING emp_id;"
                 cursor.execute(sql_emp_details, (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
                 emp_id = cursor.fetchone()[0]
@@ -845,7 +856,7 @@ def admin_add_customer():
 
 
 # --- ROUTE: Admin View Customer Details ---
-@app.route('/admin/customer/<uuid:cust_no>') # Use <uuid:cust_no> for automatic UUID conversion
+@app.route('/admin/customer/<uuid:cust_no>') 
 def admin_view_customer(cust_no):
     if 'admin' not in session:
         flash('Please login to access the admin dashboard.', 'warning')
@@ -853,7 +864,7 @@ def admin_view_customer(cust_no):
 
     conn = None
     cursor = None
-    user_data = {} # This dictionary will hold all fetched data
+    user_data = {} 
 
     try:
         conn = get_db_connection()
@@ -861,7 +872,7 @@ def admin_view_customer(cust_no):
             if debug_mode:
                 raise Exception("Database connection failed for admin_view_customer.")
             flash('Database connection failed.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard_page')) 
 
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
@@ -872,14 +883,13 @@ def admin_view_customer(cust_no):
             LEFT JOIN occupation o ON c.occ_id = o.occ_id
             LEFT JOIN financial_record f ON c.fin_code = f.fin_code
             WHERE c.cust_no = %s
-        """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
+        """, (str(cust_no),)) 
         user_data['customer'] = cursor.fetchone()
 
         if not user_data['customer']:
             flash(f'Customer with ID {cust_no} not found.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard_page')) 
 
-        # Separate the fetched data for clarity in the template
         user_data['occupation'] = {
             'occ_type': user_data['customer'].get('occ_type'),
             'bus_nature': user_data['customer'].get('bus_nature')
@@ -891,7 +901,7 @@ def admin_view_customer(cust_no):
         }
 
         # Fetch Spouse Information (if exists)
-        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (str(cust_no),)) # Convert cust_no to string
+        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (str(cust_no),)) 
         user_data['spouse'] = cursor.fetchone()
 
         # Fetch Employer Details (if exists, linked via employment_details and occupation)
@@ -901,13 +911,13 @@ def admin_view_customer(cust_no):
                 FROM employer_details ed
                 JOIN employment_details empd ON ed.emp_id = empd.emp_id
                 WHERE empd.cust_no = %s
-            """, (str(cust_no),)) # Convert cust_no to string
+            """, (str(cust_no),)) 
             user_data['employer_details'] = cursor.fetchone()
         else:
             user_data['employer_details'] = None
 
         # Fetch Company Affiliations
-        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (str(cust_no),)) # Convert cust_no to string
+        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (str(cust_no),)) 
         user_data['company_affiliations'] = cursor.fetchall()
 
         # Fetch Existing Bank Accounts
@@ -916,7 +926,7 @@ def admin_view_customer(cust_no):
             FROM existing_bank eb
             JOIN bank_details bd ON eb.bank_code = bd.bank_code
             WHERE eb.cust_no = %s
-        """, (str(cust_no),)) # Convert cust_no to string
+        """, (str(cust_no),)) 
         user_data['existing_banks'] = cursor.fetchall()
 
         # Fetch Public Official Relationships
@@ -925,10 +935,9 @@ def admin_view_customer(cust_no):
             FROM cust_po_relationship cpr
             JOIN public_official_details pod ON cpr.gov_int_id = pod.gov_int_id
             WHERE cpr.cust_no = %s
-        """, (str(cust_no),)) # Convert cust_no to string
+        """, (str(cust_no),)) 
         user_data['public_official_relationships'] = cursor.fetchall()
 
-        # Render the template, passing all collected data in 'user_data'
         return render_template('admin_view_customer.html', user_data=user_data)
 
     except psycopg2.Error as err:
@@ -936,13 +945,13 @@ def admin_view_customer(cust_no):
         if debug_mode:
             raise
         flash(f'An error occurred while fetching customer data: {err}', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) 
     except Exception as e:
         print(f"Error in admin_view_customer: {e}")
         if debug_mode:
             raise
         flash('An unexpected error occurred while loading customer details.', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) 
     finally:
         if cursor:
             cursor.close()
@@ -950,7 +959,7 @@ def admin_view_customer(cust_no):
             conn.close()
 
 # --- NEW ROUTE: Admin Edit Customer Details ---
-@app.route('/admin/edit_customer/<uuid:cust_no>', methods=['GET', 'POST']) # Use <uuid:cust_no>
+@app.route('/admin/edit_customer/<uuid:cust_no>', methods=['GET', 'POST']) 
 def admin_edit_customer(cust_no):
     if 'admin' not in session:
         flash('Please login to access the admin dashboard.', 'warning')
@@ -958,7 +967,7 @@ def admin_edit_customer(cust_no):
 
     conn = None
     cursor = None
-    customer_data = {} # Will hold all fetched data for the customer
+    customer_data = {} 
 
     try:
         conn = get_db_connection()
@@ -966,38 +975,30 @@ def admin_edit_customer(cust_no):
             if debug_mode:
                 raise Exception("Database connection failed for admin_edit_customer.")
             flash('Database connection failed.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard_page')) 
 
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
         if request.method == 'POST':
             # --- Handle form submission for UPDATE ---
-            # Extract form data
-            # Personal Information
             custname = request.form.get('custname')
-            datebirth = request.form.get('datebirth')
+            datebirth = request.form.get('datebirth') or None # Handle empty date string
             nationality = request.form.get('nationality')
             citizenship = request.form.get('citizenship')
             custsex = request.form.get('custsex')
             placebirth = request.form.get('placebirth')
             civilstatus = request.form.get('civilstatus')
-            num_children = request.form.get('num_children') or '0' # Default to '0' if empty
+            num_children = request.form.get('num_children') or '0'
             mmaiden_name = request.form.get('mmaiden_name')
             cust_address = request.form.get('cust_address')
             email_address = request.form.get('email_address')
             contact_no = request.form.get('contact_no')
-            # Fetch registration_status from form (if provided by a future update to admin_edit_customer.html)
-            # For now, it's not in the provided HTML, so we'll just update other fields.
-            # If you add a dropdown/input for this, you'd get it here:
-            # new_registration_status = request.form.get('registration_status') 
+            registration_status = request.form.get('registration_status') # Added this field from form
 
-
-            # Spouse Information
             sp_name = request.form.get('sp_name')
-            sp_datebirth = request.form.get('sp_datebirth')
+            sp_datebirth = request.form.get('sp_datebirth') or None # Handle empty date string
             sp_profession = request.form.get('sp_profession')
 
-            # Employment Information (from individual fields, as dynamic lists are for other sections)
             occ_type = request.form.get('occ_type')
             bus_nature = request.form.get('bus_nature')
             tin_id = request.form.get('tin_id')
@@ -1005,35 +1006,35 @@ def admin_edit_customer(cust_no):
             emp_address = request.form.get('emp_address')
             phonefax_no = request.form.get('phonefax_no')
             job_title = request.form.get('job_title')
-            emp_date = request.form.get('emp_date')
+            emp_date = request.form.get('emp_date') or None # Handle empty date string
 
-            # Financial Information
             source_wealth = request.form.get('source_wealth')
             mon_income = request.form.get('mon_income')
             ann_income = request.form.get('ann_income')
 
-            conn.autocommit = False # Start a transaction
+            conn.autocommit = False 
 
             # --- Update Customer Table ---
-            # Include registration_status in the update if it's managed via this form
-            # For now, without a form field, we won't update it here through the form submit.
-            # If you add a 'registration_status' input, you'd add it to this UPDATE statement.
             cursor.execute("""
                 UPDATE customer
                 SET custname = %s, datebirth = %s, nationality = %s, citizenship = %s, custsex = %s,
                     placebirth = %s, civilstatus = %s, num_children = %s, mmaiden_name = %s,
-                    cust_address = %s, email_address = %s, contact_no = %s
-                    -- , registration_status = %s -- Uncomment if adding a form field for status
+                    cust_address = %s, email_address = %s, contact_no = %s, registration_status = %s
                 WHERE cust_no = %s
                 RETURNING occ_id, fin_code;
             """, (custname, datebirth, nationality, citizenship, custsex,
                   placebirth, civilstatus, int(num_children), mmaiden_name,
-                  cust_address, email_address, contact_no, 
-                  # new_registration_status, # Uncomment if adding a form field for status
-                  str(cust_no))) # CONVERT UUID TO STRING HERE
+                  cust_address, email_address, contact_no, registration_status, # Include registration_status
+                  str(cust_no))) 
             
-            # Fetch the current occ_id and fin_code from customer to update related tables
-            current_occ_id, current_fin_code = cursor.fetchone()
+            customer_ids_info = cursor.fetchone()
+
+            if not customer_ids_info:
+                flash(f'Customer with ID {cust_no} not found for update.', 'danger')
+                conn.rollback()
+                return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+
+            current_fin_code, current_occ_id = customer_ids_info # Correct order as per RETURNING clause
 
             # --- Update Occupation Table (or insert if new and not found) ---
             if current_occ_id:
@@ -1041,6 +1042,12 @@ def admin_edit_customer(cust_no):
                     UPDATE occupation SET occ_type = %s, bus_nature = %s
                     WHERE occ_id = %s;
                 """, (occ_type, bus_nature, current_occ_id))
+            else: # If customer had no occupation, create one
+                if occ_type or bus_nature:
+                    cursor.execute("INSERT INTO occupation (occ_type, bus_nature) VALUES (%s, %s) RETURNING occ_id;", (occ_type, bus_nature))
+                    new_occ_id = cursor.fetchone()[0]
+                    cursor.execute("UPDATE customer SET occ_id = %s WHERE cust_no = %s;", (new_occ_id, str(cust_no)))
+
 
             # --- Update Financial Record Table ---
             if current_fin_code:
@@ -1049,28 +1056,29 @@ def admin_edit_customer(cust_no):
                     SET source_wealth = %s, mon_income = %s, ann_income = %s
                     WHERE fin_code = %s;
                 """, (source_wealth, mon_income, ann_income, current_fin_code))
+            else: # If customer had no financial record, create one
+                if source_wealth or mon_income or ann_income:
+                    cursor.execute("INSERT INTO financial_record (source_wealth, mon_income, ann_income) VALUES (%s, %s, %s) RETURNING fin_code;", (source_wealth, mon_income, ann_income))
+                    new_fin_code = cursor.fetchone()[0]
+                    cursor.execute("UPDATE customer SET fin_code = %s WHERE cust_no = %s;", (new_fin_code, str(cust_no)))
+
 
             # --- Update Spouse Table (Conditional insert/update/delete) ---
-            if civilstatus == 'Married':
-                if sp_name and sp_datebirth and sp_profession:
-                    cursor.execute("""
-                        INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession)
-                        VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (cust_no) DO UPDATE SET
-                            sp_name = EXCLUDED.sp_name,
-                            sp_datebirth = EXCLUDED.sp_datebirth,
-                            sp_profession = EXCLUDED.sp_profession;
-                    """, (str(cust_no), sp_name, sp_datebirth, sp_profession)) # CONVERT UUID TO STRING HERE
-                else:
-                    # If civil status is married but spouse data is empty, delete spouse record
-                    cursor.execute("DELETE FROM spouse WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
+            if civilstatus == 'Married' and sp_name and sp_datebirth and sp_profession:
+                cursor.execute("""
+                    INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (cust_no) DO UPDATE SET
+                        sp_name = EXCLUDED.sp_name,
+                        sp_datebirth = EXCLUDED.sp_datebirth,
+                        sp_profession = EXCLUDED.sp_profession;
+                """, (str(cust_no), sp_name, sp_datebirth, sp_profession)) 
             else:
-                # If civil status is not married, ensure no spouse record exists
-                cursor.execute("DELETE FROM spouse WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
+                cursor.execute("DELETE FROM spouse WHERE cust_no = %s;", (str(cust_no),)) 
 
             # --- Update Employer Details and Employment Details (Complex - simplified) ---
-            if occ_type == 'Employed':
-                cursor.execute("SELECT emp_id FROM employment_details WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
+            if occ_type == 'Employed' and empname: # Only manage employer if occupation is 'Employed' and empname provided
+                cursor.execute("SELECT emp_id FROM employment_details WHERE cust_no = %s;", (str(cust_no),))
                 existing_emp_id_result = cursor.fetchone()
                 existing_emp_id = existing_emp_id_result[0] if existing_emp_id_result else None
 
@@ -1080,43 +1088,55 @@ def admin_edit_customer(cust_no):
                         SET occ_id = %s, tin_id = %s, empname = %s, emp_address = %s, phonefax_no = %s, job_title = %s, emp_date = %s
                         WHERE emp_id = %s;
                     """, (current_occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date, existing_emp_id))
-                else:
-                    if empname: # Only insert if employer name is provided
-                        sql_emp_details = "INSERT INTO employer_details (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING emp_id;"
-                        cursor.execute(sql_emp_details, (current_occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
-                        new_emp_id = cursor.fetchone()[0]
-                        cursor.execute("INSERT INTO employment_details (cust_no, emp_id) VALUES (%s, %s);", (str(cust_no), new_emp_id)) # CONVERT UUID TO STRING HERE
-            else:
-                cursor.execute("DELETE FROM employment_details WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
+                else: # Insert new employer details if none existed for this customer
+                    sql_emp_details = "INSERT INTO employer_details (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING emp_id;"
+                    cursor.execute(sql_emp_details, (current_occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
+                    new_emp_id = cursor.fetchone()[0]
+                    cursor.execute("INSERT INTO employment_details (cust_no, emp_id) VALUES (%s, %s);", (str(cust_no), new_emp_id))
+            else: # If not employed or employer name is removed, delete employer details
+                cursor.execute("DELETE FROM employment_details WHERE cust_no = %s;", (str(cust_no),))
+                # Also delete from employer_details if no other employment_details reference it
+                if current_occ_id: # Only attempt if there was an occ_id
+                    cursor.execute("SELECT emp_id FROM employer_details WHERE occ_id = %s AND emp_id NOT IN (SELECT emp_id FROM employment_details);", (current_occ_id,))
+                    orphaned_emp_ids = cursor.fetchall()
+                    for emp_id_to_delete in orphaned_emp_ids:
+                        cursor.execute("DELETE FROM employer_details WHERE emp_id = %s;", (emp_id_to_delete[0],))
+
 
             # --- Update Dynamic Lists: Company Affiliations, Existing Banks, Public Official Relationships ---
             # Company Affiliations
-            cursor.execute("DELETE FROM company_affiliation WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
+            cursor.execute("DELETE FROM company_affiliation WHERE cust_no = %s;", (str(cust_no),)) 
             depositor_roles = request.form.getlist('depositor_role[]')
             dep_compnames = request.form.getlist('dep_compname[]')
             for role, comp_name in zip(depositor_roles, dep_compnames):
-                if role and comp_name:
-                    cursor.execute("INSERT INTO company_affiliation (cust_no, depositor_role, dep_compname) VALUES (%s, %s, %s);", (str(cust_no), role, comp_name)) # CONVERT UUID TO STRING HERE
+                if role and comp_name: # Only insert if both fields are non-empty
+                    cursor.execute("INSERT INTO company_affiliation (cust_no, depositor_role, dep_compname) VALUES (%s, %s, %s);", (str(cust_no), role, comp_name)) 
 
             # Existing Bank Accounts
-            cursor.execute("DELETE FROM existing_bank WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
+            cursor.execute("DELETE FROM existing_bank WHERE cust_no = %s;", (str(cust_no),)) 
             bank_names = request.form.getlist('bank_name[]')
             branches = request.form.getlist('branch[]')
             acc_types = request.form.getlist('acc_type[]')
             for b_name, branch, a_type in zip(bank_names, branches, acc_types):
-                if b_name and branch and a_type:
+                if b_name and branch and a_type: # Only insert if all fields are non-empty
                     cursor.execute("INSERT INTO bank_details (bank_code, bank_name, branch) VALUES (%s, %s, %s) ON CONFLICT (bank_code) DO NOTHING;", (b_name, b_name, branch))
-                    cursor.execute("INSERT INTO existing_bank (cust_no, bank_code, acc_type) VALUES (%s, %s, %s);", (str(cust_no), b_name, a_type)) # CONVERT UUID TO STRING HERE
+                    cursor.execute("INSERT INTO existing_bank (cust_no, bank_code, acc_type) VALUES (%s, %s, %s);", (str(cust_no), b_name, a_type)) 
 
             # Public Official Relationships
-            cursor.execute("DELETE FROM cust_po_relationship WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
+            cursor.execute("DELETE FROM cust_po_relationship WHERE cust_no = %s;", (str(cust_no),)) 
             gov_int_names = request.form.getlist('gov_int_name[]')
             official_positions = request.form.getlist('official_position[]')
             branch_orgnames = request.form.getlist('branch_orgname[]')
             relation_descs = request.form.getlist('relation_desc[]')
 
-            for gov_name, pos, org, rel_desc in zip(gov_int_names, official_positions, branch_orgnames, relation_descs):
-                if gov_name and pos and org and rel_desc:
+            min_len_po = min(len(gov_int_names), len(official_positions), len(branch_orgnames), len(relation_descs))
+            for i in range(min_len_po):
+                gov_name = gov_int_names[i]
+                pos = official_positions[i]
+                org = branch_orgnames[i]
+                rel_desc = relation_descs[i]
+
+                if gov_name and pos and org and rel_desc: # Only insert if all fields are non-empty
                     cursor.execute("SELECT gov_int_id FROM public_official_details WHERE gov_int_name = %s AND official_position = %s AND branch_orgname = %s;", (gov_name, pos, org))
                     po_id_result = cursor.fetchone()
                     if po_id_result:
@@ -1125,7 +1145,7 @@ def admin_edit_customer(cust_no):
                         cursor.execute("INSERT INTO public_official_details (gov_int_name, official_position, branch_orgname) VALUES (%s, %s, %s) RETURNING gov_int_id;", (gov_name, pos, org))
                         gov_int_id = cursor.fetchone()[0]
                     
-                    cursor.execute("INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc) VALUES (%s, %s, %s);", (str(cust_no), gov_int_id, rel_desc)) # CONVERT UUID TO STRING HERE
+                    cursor.execute("INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc) VALUES (%s, %s, %s);", (str(cust_no), gov_int_id, rel_desc)) 
             
             conn.commit()
             flash('Customer details updated successfully!', 'success')
@@ -1139,14 +1159,13 @@ def admin_edit_customer(cust_no):
             LEFT JOIN occupation o ON c.occ_id = o.occ_id
             LEFT JOIN financial_record f ON c.fin_code = f.fin_code
             WHERE c.cust_no = %s
-        """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
+        """, (str(cust_no),)) 
         customer_data['customer'] = cursor.fetchone()
 
         if not customer_data['customer']:
             flash(f'Customer with ID {cust_no} not found.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard_page')) 
 
-        # Corrected variable name: from user_data to customer_data
         customer_data['occupation'] = {
             'occ_type': customer_data['customer'].get('occ_type'),
             'bus_nature': customer_data['customer'].get('bus_nature')
@@ -1158,7 +1177,7 @@ def admin_edit_customer(cust_no):
         }
 
         # Fetch Spouse Information (if exists)
-        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (str(cust_no),)) # Convert cust_no to string
+        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (str(cust_no),)) 
         customer_data['spouse'] = cursor.fetchone()
 
         # Fetch Employer Details (if exists and occupation is 'Employed')
@@ -1168,13 +1187,13 @@ def admin_edit_customer(cust_no):
                 FROM employer_details ed
                 JOIN employment_details empd ON ed.emp_id = empd.emp_id
                 WHERE empd.cust_no = %s
-            """, (str(cust_no),)) # Convert cust_no to string
+            """, (str(cust_no),)) 
             customer_data['employer_details'] = cursor.fetchone()
         else:
             customer_data['employer_details'] = None
 
         # Fetch Company Affiliations
-        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (str(cust_no),)) # Convert UUID to string
+        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (str(cust_no),)) 
         customer_data['company_affiliations'] = cursor.fetchall()
 
         # Fetch Existing Bank Accounts
@@ -1183,7 +1202,7 @@ def admin_edit_customer(cust_no):
             FROM existing_bank eb
             JOIN bank_details bd ON eb.bank_code = bd.bank_code
             WHERE eb.cust_no = %s
-        """, (str(cust_no),)) # Convert UUID to string
+        """, (str(cust_no),)) 
         customer_data['existing_banks'] = cursor.fetchall()
 
         # Fetch Public Official Relationships
@@ -1192,7 +1211,7 @@ def admin_edit_customer(cust_no):
             FROM cust_po_relationship cpr
             JOIN public_official_details pod ON cpr.gov_int_id = pod.gov_int_id
             WHERE cpr.cust_no = %s
-        """, (str(cust_no),)) # Convert UUID to string
+        """, (str(cust_no),)) 
         customer_data['public_official_relationships'] = cursor.fetchall()
 
         return render_template('admin_edit_customer.html', customer_data=customer_data)
@@ -1202,13 +1221,13 @@ def admin_edit_customer(cust_no):
         if debug_mode:
             raise
         flash(f'An error occurred while fetching customer data: {err}', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) 
     except Exception as e:
         print(f"Error in admin_edit_customer: {e}")
         if debug_mode:
             raise
         flash('An unexpected error occurred while loading customer details for editing.', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) 
     finally:
         if cursor:
             cursor.close()
@@ -1225,7 +1244,7 @@ def delete_customer():
     cust_no = request.form.get('cust_no')
     if not cust_no:
         flash('Customer ID is missing for deletion.', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) 
 
     conn = None
     cursor = None
@@ -1235,63 +1254,54 @@ def delete_customer():
             if debug_mode:
                 raise Exception("Database connection failed for delete_customer.")
             flash('Database connection failed.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard_page')) 
 
         cursor = conn.cursor()
-        conn.autocommit = False # Start a transaction
-
-        # PostgreSQL handles CASCADE deletes via foreign key constraints,
-        # so explicit deletions from child tables are often not strictly needed
-        # if the foreign keys are set up with ON DELETE CASCADE.
-        # However, to explicitly handle related record deletion and orphaned records that
-        # are not covered by CASCADE (e.g., if an occ_id or fin_code might become orphaned)
+        conn.autocommit = False 
 
         # 1. Get occ_id and fin_code before deleting the customer
-        cursor.execute("SELECT fin_code, occ_id FROM customer WHERE cust_no = %s", (str(cust_no),)) # CONVERT UUID TO STRING HERE
+        cursor.execute("SELECT fin_code, occ_id FROM customer WHERE cust_no = %s", (str(cust_no),)) 
         customer_info = cursor.fetchone()
-        fin_code = customer_info[0] if customer_info else None
-        occ_id = customer_info[1] if customer_info else None
+        
+        if not customer_info: # If customer not found, nothing to delete
+            flash(f'Customer {cust_no} not found for deletion.', 'warning')
+            conn.rollback() # Rollback any implicit changes if necessary
+            return redirect(url_for('admin_dashboard_page'))
 
-        # 2. Delete the customer record. This will trigger CASCADE deletes for:
-        #    - credentials
-        #    - cust_po_relationship
-        #    - existing_bank
-        #    - company_affiliation
-        #    - employment_details
-        #    - spouse
-        # if foreign keys are set up with ON DELETE CASCADE.
-        cursor.execute("DELETE FROM customer WHERE cust_no = %s", (str(cust_no),)) # CONVERT UUID TO STRING HERE
+        fin_code, occ_id = customer_info 
+
+        cursor.execute("DELETE FROM customer WHERE cust_no = %s", (str(cust_no),)) 
         
         # 3. Handle deletion of financial_record and occupation if they are no longer referenced
         if fin_code:
             cursor.execute("SELECT COUNT(*) FROM customer WHERE fin_code = %s", (fin_code,))
-            if cursor.fetchone()[0] == 0: # If no other customers use this fin_code
+            if cursor.fetchone()[0] == 0: 
                 cursor.execute("DELETE FROM financial_record WHERE fin_code = %s", (fin_code,))
         
         if occ_id:
             cursor.execute("SELECT COUNT(*) FROM customer WHERE occ_id = %s", (occ_id,))
-            if cursor.fetchone()[0] == 0: # If no other customers use this occ_id
+            if cursor.fetchone()[0] == 0: 
                 cursor.execute("DELETE FROM occupation WHERE occ_id = %s", (occ_id,))
 
-        conn.commit() # Commit the transaction if all deletions are successful
+        conn.commit() 
         flash(f'Customer {cust_no} and all related records deleted successfully!', 'success')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) 
 
     except psycopg2.Error as err:
-        conn.rollback() # Rollback on error
+        conn.rollback() 
         print(f"Database error during customer deletion: {err}")
         if debug_mode:
             raise
         flash(f'An error occurred during deletion: {err}', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) 
     except Exception as e:
-        if conn: # Check if conn exists before trying to rollback
+        if conn: 
             conn.rollback()
         print(f"Error during customer deletion: {e}")
         if debug_mode:
             raise
         flash('An unexpected error occurred during customer deletion.', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) 
     finally:
         if cursor:
             cursor.close()
@@ -1302,5 +1312,5 @@ def delete_customer():
 # --- Main execution block ---
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000)) 
-    _ensure_database_schema() # Run schema check/update on app startup
+    _ensure_database_schema() 
     app.run(host='0.0.0.0', port=port, debug=debug_mode)
