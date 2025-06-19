@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LBMS Portal - Registration (Step 3)</title>
+    <link rel="stylesheet" href="static/registration.css">
+</head>
+<body>
+    <div class="background-overlay"></div>
+    <div class="container">
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-step completed">
+                <div class="step-number">1</div>
+                <div class="step-label">Personal Info</div>
+            </div>
+            <div class="progress-step completed">
+                <div class="step-number">2</div>
+                <div class="step-label">Employment</div>
+            </div>
+            <div class="progress-step active">
+                <div class="step-number">3</div>
+                <div class="step-label">Additional</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">4</div>
+                <div class="step-label">Review</div>
+            </div>
+        </div>
+        <form id="registration3-form" class="profile-form">
+            <h2><span class="icon"><img src="static/assets/personal_icon.png" alt="Profile Icon" style="width: 1.3em; vertical-align: middle;"></span> CUSTOMER INFORMATION SHEET FOR INDIVIDUAL CUSTOMER</h2>
+            <hr style="border: 0; border-top: 1.5px solid #545454; margin: 10px 0 20px 0;">
+            <section>
+                <h3 style="margin-top:0.5em;">ADDITIONAL INFORMATION</h3>
+                <div id="depositor-entries">
+                    <div class="row depositor-entry">
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="depositorRole[]">
+                            <label>Depositor Role</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="companyName[]">
+                            <label>Company Name</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="add-btn" onclick="addDepositorEntry()">+ Add Depositor</button>
+            </section>
+            <section>
+                <h3>EXISTING BANK ACCOUNT</h3>
+                <div id="bank-entries">
+                    <div class="row bank-entry">
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="bank[]">
+                            <label>Bank</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="branch[]">
+                            <label>Branch</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="accountType[]">
+                            <label>Account Type</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="add-btn" onclick="addBankEntry()">+ Add Bank Account</button>
+            </section>
+            <section>
+                <h3>RELATIONSHIP TO OFFICIAL OF GOVERNMENT/INTERNATIONAL ORGANIZATION</h3>
+                <div id="relationship-entries">
+                    <div class="row relationship-entry">
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="govLastName[]">
+                            <label>Last Name</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="govFirstName[]">
+                            <label>First Name</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="govMiddleName[]">
+                            <label>Middle Name</label>
+                        </div>
+                    </div>
+                    <div class="row relationship-entry">
+                        <div class="floating-label-group">
+                            <select name="relationship[]">
+                                <option value="" disabled selected hidden>▼</option>
+                                <option value="Father">Father</option>
+                                <option value="Mother">Mother</option>
+                                <option value="Mother-in- Law">Mother-in-Law</option>
+                                <option value="Father-in-Law">Father-in-Law</option>
+                                <option value="Son">Son</option>
+                                <option value="Daughter">Daughter</option>
+                                <option value="Son-in-Law">Son-in-Law</option>
+                                <option value="Daughter-in-Law">Daughter-in-Law</option>
+                                <option value="Brother">Brother</option>
+                                <option value="Sister">Sister</option>
+                                <option value="Sibling">Sibling</option>
+                                <option value="Brother-in-Law">Brother-in-Law</option>
+                                <option value="Sister-in-Law">Sister-in-Law</option>
+                                <option value="Grandfather">Grandfather</option>
+                                <option value="Grandmother">Grandmother</option>
+                                <option value="Granddaughter">Granddaughter</option>
+                                <option value="Grandson">Grandson</option>
+                                <option value="Uncle">Uncle</option>
+                                <option value="Aunt">Aunt</option>
+                                <option value="Nephew">Nephew</option>
+                                <option value="Niece">Niece</option>
+                                <option value="Cousin">Cousin</option>
+                                <option value="Spouse">Spouse</option>
+                            </select>
+                            <label>Relationship</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="position[]">
+                            <label>Position</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="govBranchOrgName[]">
+                            <label>Government Branch/Organization Name</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="add-btn" onclick="addRelationshipEntry()">+ Add Relationship</button>
+            </section>
+            <div class="form-actions">
+                <div class="left-buttons">
+                    <button type="button" class="cancel-btn">⟲ CANCEL</button>
+                </div>
+                <div class="right-buttons">
+                    <button type="button" class="back-btn">← BACK</button>
+                    <button type="submit" class="next-btn">NEXT</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <script src="static/js/registration.js"></script>
+    <script>
+    // Dynamic Depositor Role/Company Name
+    function addDepositorEntry() {
+        const container = document.getElementById('depositor-entries');
+        const entries = container.querySelectorAll('.depositor-entry');
+        if (entries.length >= 3) return;
+        const clone = entries[0].cloneNode(true);
+        clone.querySelectorAll('input').forEach(input => input.value = '');
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.className = 'remove-btn';
+        removeBtn.onclick = function() { clone.remove(); };
+        clone.appendChild(removeBtn);
+        container.appendChild(clone);
+    }
+    // Dynamic Bank Account
+    function addBankEntry() {
+        const container = document.getElementById('bank-entries');
+        const entries = container.querySelectorAll('.bank-entry');
+        if (entries.length >= 3) return;
+        const clone = entries[0].cloneNode(true);
+        clone.querySelectorAll('input').forEach(input => input.value = '');
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.className = 'remove-btn';
+        removeBtn.onclick = function() { clone.remove(); };
+        clone.appendChild(removeBtn);
+        container.appendChild(clone);
+    }
+    // Dynamic Relationship
+    function addRelationshipEntry() {
+        const container = document.getElementById('relationship-entries');
+        const entries = container.querySelectorAll('.relationship-entry');
+        if (entries.length >= 6) return; // 2 rows per entry
+        // Clone both rows (name row and details row)
+        const nameRow = entries[0].cloneNode(true);
+        nameRow.querySelectorAll('input').forEach(input => input.value = '');
+        const detailsRow = entries[1].cloneNode(true);
+        detailsRow.querySelectorAll('input,select').forEach(input => input.value = '');
+        // Remove button
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.className = 'remove-btn';
+        removeBtn.onclick = function() { nameRow.remove(); detailsRow.remove(); };
+        detailsRow.appendChild(removeBtn);
+        container.appendChild(nameRow);
+        container.appendChild(detailsRow);
+    }
+    </script>
+</body>
+</html>

@@ -2,34 +2,58 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>LANDBANK Home</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <style>
-    .view-all-record {
-      text-align: center;
-      margin-top: 20px;
-    }
-    .view-all-record a {
-      display: inline-block;
-      padding: 10px 20px;
-      background-color: green;
-      color: white;
-      text-decoration: none;
-      border-radius: 5px;
-    }
-    .view-all-record a:hover {
-      background-color: darkgreen;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Landbank - Customer Information Management System</title>
+  <link rel="stylesheet" href="home.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cedarville+Cursive&family=Fredoka:wght@300..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Orbitron:wght@400..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div style="text-align: center; margin-top: 100px;">
-    <h1>Welcome, {{ user }}!</h1>
-    <p>You have successfully logged in to your LANDBANK account.</p>
-    <a href="/logout" style="display: inline-block; margin-top: 20px; color: red;">Logout</a>
-  </div>
-  <div class="view-all-record">
-    <a href="/my_record">View My Existing Record</a>
-  </div>  
+    <div class="background-overlay"></div>
+  <header class="navbar">
+    <div class="navbar-left">
+      <img src="assets/LANDBANK.png" alt="Landbank Logo" class="navbar-logo">
+      <span class="navbar-title">LBMS PORTAL</span>
+    </div>
+    <nav class="navbar-links">
+      <a href="#">HOME</a>
+      <a href="#">ABOUT</a>
+      <a href="#">SERVICES</a>
+      <a href="#">CONTACT</a>
+    </nav>
+  </header>
+  <main class="main-content">
+    <div class="center-content">
+    <img src="assets/LANDBANK.png" alt="Landbank Logo" class="main-logo">
+      <h1 id="welcome-message">WELCOME, USER</h1> 
+      <p>What would you like to do?</p>
+      <div class="icon-row">
+        <div class="icon-block">
+          <img src="assets/transactions-icon.png" alt="Transactions">
+          <div>TRANSACTIONS</div>
+        </div>
+        <div class="icon-block">
+          <img src="assets/profile-icon.png" alt="Profile">
+          <div>PROFILE</div>
+        </div>
+        <div class="icon-block">
+          <img src="assets/forms-icon.png" alt="Forms">
+          <div>FORMS</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <script>
+    // Get user from localStorage
+    const user = localStorage.getItem('lbmsUser');
+    if (!user) {
+      // Not logged in, redirect to login
+      window.location.href = 'login.html';
+    } else {
+      document.getElementById('welcome-message').textContent = `WELCOME, ${user.toUpperCase()}`;
+    }
+  </script>
 </body>
 </html>

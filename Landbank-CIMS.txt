@@ -1,0 +1,848 @@
+
+##Landbank-CIMS##
+
+
+-- Create database
+CREATE DATABASE landbank;
+
+-- Create occupation table
+CREATE TABLE occupation (
+    occ_id VARCHAR(10) NOT NULL PRIMARY KEY,
+    occ_type ENUM('Employed', 'Self-employed', 'OFW/Overseas Filipino', 'Retired', 'Farmer/Fisher', 
+        'Student/Minor', 'Unemployed', 'Housewife', 'Lawyers/Notary/Independent Legal Professional/Accountant', 
+        'Government Official') NOT NULL,
+    bus_nature VARCHAR(300) NOT NULL
+);
+
+-- Create financial record table
+CREATE TABLE financial_record (
+    fin_code VARCHAR(10) NOT NULL PRIMARY KEY,
+    source_wealth VARCHAR(150) NOT NULL,
+    mon_income ENUM('Php 30,000.00 and below', 'Php 30,000.01-50,000.00', 'Php 50,000.01-100,000.00', 'Php 100,000.01-500,000.00', 'Over Php 500,000.00') NOT NULL,
+    ann_income ENUM('Php 360,000.00 and below', 'Php 360,000.01-600,000.00', 'Php 600,000.01-1,200,000.00', 'Php 1,200,000.01-6,000,000.00', 'Over Php 6,000,000.00') NOT NULL
+);
+
+-- Create employer details table
+CREATE TABLE employer_details (
+    emp_id VARCHAR(10) NOT NULL PRIMARY KEY,
+    tin_id VARCHAR(20) NOT NULL UNIQUE,
+    empname VARCHAR(100) NOT NULL,
+    emp_address VARCHAR(100) NOT NULL,
+    phonefax_no VARCHAR(25) NOT NULL,
+    job_title VARCHAR(50) NOT NULL,
+    emp_date DATE NOT NULL
+);
+
+-- Create customer table
+CREATE TABLE customer (
+    cust_no VARCHAR(10) NOT NULL PRIMARY KEY,
+    custname VARCHAR(50) NOT NULL,
+    datebirth DATE NOT NULL,
+    nationality VARCHAR(20) NOT NULL,
+    citizenship VARCHAR(20) NOT NULL,
+    custsex ENUM('Male', 'Female') NOT NULL,
+    placebirth VARCHAR(20) NOT NULL,
+    civilstatus ENUM('Single', 'Married', 'Widowed', 'Divorced') NOT NULL,
+    num_children INT NOT NULL,
+    mmaiden_name VARCHAR(50) NOT NULL,
+    cust_address VARCHAR(100) NOT NULL,
+    email_address VARCHAR(50) NOT NULL UNIQUE,
+    contact_no VARCHAR(20) NOT NULL,
+    occ_id VARCHAR(10),
+    fin_code VARCHAR(10),
+    CONSTRAINT fk_customer_occ
+        FOREIGN KEY (occ_id)
+        REFERENCES occupation (occ_id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE,  
+    CONSTRAINT fk_customer_fin
+        FOREIGN KEY (fin_code)
+        REFERENCES financial_record (fin_code)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE
+);
+
+-- Create employment_details table (now correctly references customer)
+CREATE TABLE employment_details (
+    empd INT AUTO_INCREMENT PRIMARY KEY,
+    cust_no VARCHAR(10) NOT NULL UNIQUE,  
+    emp_id VARCHAR(10), 
+    CONSTRAINT fk_employment_customer
+        FOREIGN KEY (cust_no)
+        REFERENCES customer(cust_no)
+        ON DELETE CASCADE 
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_employment_employer
+        FOREIGN KEY (emp_id)
+        REFERENCES employer_details(emp_id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE
+);
+
+-- Create spouse table
+CREATE TABLE spouse (
+    cust_no VARCHAR(10) NOT NULL,
+    sp_code VARCHAR(5) NOT NULL,
+    sp_name VARCHAR(100) NOT NULL,
+    sp_datebirth DATE NOT NULL,
+    sp_profession VARCHAR(50) NOT NULL, 
+    PRIMARY KEY (sp_code),
+    CONSTRAINT fk_spouse_customer
+        FOREIGN KEY (cust_no)
+        REFERENCES customer(cust_no)
+        ON DELETE CASCADE 
+        ON UPDATE CASCADE
+);
+
+-- Create company affiliation table 
+CREATE TABLE company_affiliation (
+    cust_no VARCHAR(10) NOT NULL,    
+    depositor_role VARCHAR(30) NOT NULL,
+    dep_compname VARCHAR(100) NOT NULL,
+    PRIMARY KEY (cust_no, depositor_role, dep_compname),
+    CONSTRAINT fk_company_customer
+        FOREIGN KEY (cust_no)
+        REFERENCES customer(cust_no)
+        ON DELETE CASCADE  
+        ON UPDATE CASCADE
+);
+
+-- Create bank details table
+CREATE TABLE bank_details (
+    bank_code VARCHAR(20) PRIMARY KEY NOT NULL,
+    bank_name VARCHAR(100) NOT NULL,
+    branch VARCHAR(100) NOT NULL
+);
+
+-- Create existing bank accounts table
+CREATE TABLE existing_bank (
+    cust_no VARCHAR(10) NOT NULL,
+    bank_code VARCHAR(20) NOT NULL,
+    acc_type VARCHAR(30) NOT NULL,
+    PRIMARY KEY (cust_no, bank_code, acc_type),
+    CONSTRAINT fk_bank_customer
+        FOREIGN KEY (cust_no)
+        REFERENCES customer(cust_no)
+        ON DELETE CASCADE  
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_bank_details
+        FOREIGN KEY (bank_code)
+        REFERENCES bank_details(bank_code)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+);
+
+-- Create public official details table
+CREATE TABLE public_official_details (
+    gov_int_id VARCHAR(10) PRIMARY KEY NOT NULL,
+    gov_int_name VARCHAR(100) NOT NULL,
+    official_position VARCHAR(100) NOT NULL,
+    branch_orgname VARCHAR(100) NOT NULL
+);
+
+-- Create customer-public official relationship table 
+CREATE TABLE cust_po_relationship (
+    cust_no VARCHAR(10),
+    gov_int_id VARCHAR(10),
+    relation_desc ENUM('Father', 'Mother', 'Mother-in-Law', 'Father-in-Law', 'Son', 'Daughter', 'Son-in-Law',
+    'Daughter-in-Law', 'Brother', 'Sister', 'Brother-in-Law', 'Sister-in-Law', 'Grandfather', 'Grandmother', 'Grandson', 'Granddaughter', 'Uncle',
+    'Aunt', 'Nephew', 'Niece', 'Cousin', 'Spouse') NOT NULL,
+    PRIMARY KEY (cust_no, gov_int_id, relation_desc),
+    CONSTRAINT fk_relationship_customer
+        FOREIGN KEY (cust_no)
+        REFERENCES customer(cust_no)
+        ON DELETE CASCADE 
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_relationship_official
+        FOREIGN KEY (gov_int_id)
+        REFERENCES public_official_details(gov_int_id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+);
+
+
+
+connect it with this html regitration:
+
+
+#registration1.html#
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LBMS Portal - Registration</title>
+    <link rel="stylesheet" href="static/registration.css">
+</head>
+<body>
+      <div class="background-overlay">
+  </div>
+    <div class="container">
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-step active">
+                <div class="step-number">1</div>
+                <div class="step-label">Personal Info</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">2</div>
+                <div class="step-label">Employment</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">3</div>
+                <div class="step-label">Additional</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">4</div>
+                <div class="step-label">Review</div>
+            </div>
+        </div>
+        <form id="registration1-form" class="profile-form">
+            <h2><span class="icon"><img src="static
+/assets/personal_icon.png" alt="Profile Icon" style="width: 1.3em; vertical-align: middle;"></span> CUSTOMER INFORMATION SHEET FOR INDIVIDUAL CUSTOMER</h2>
+            <hr style="border: 0; border-top: 1.5px solid #545454; margin: 10px 0 20px 0;">
+            <section class="section-name">
+                <h3><span class="icon"><img src="static/assets/info_icon.png" alt="Personal Icon" style="width: 2em; vertical-align: middle;"></span><span style="color:#b90404;">*</span>PERSONAL INFORMATION</h3>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="lastName" name="lastName" required>
+                        <label for="lastName">Last Name</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="firstName" name="firstName" required>
+                        <label for="firstName">First Name</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="middleName" name="middleName">
+                        <label for="middleName">Middle Name</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="date" id="dob" name="dob" required>
+                        <label for="dob">Date of Birth</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="nationality" name="nationality">
+                        <label for="nationality">Nationality</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="citizenship" name="citizenship">
+                        <label for="citizenship">Citizenship</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <select id="sex" name="sex" required>
+                            <option value="" disabled selected hidden>▼</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                        <label for="sex">Sex</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <select id="civilStatus" name="civilStatus" required>
+                            <option value="" disabled selected hidden>▼</option>
+                            <option value="Single">Single</option>
+                            <option value="Married">Married</option>
+                            <option value="Widowed">Widowed</option>
+                            <option value="Divorced">Divorced</option>
+                        </select>
+                        <label for="civilStatus">Civil Status</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="number" id="children" name="children" min="0">
+                        <label for="children">No. of Children</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="placeOfBirth" name="placeOfBirth">
+                        <label for="placeOfBirth">Place of Birth</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="address" name="address">
+                        <label for="address">Current Address (No./Street, Subd.,Brgy./District/Municipality/City/Province)</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="motherMaidenName" name="motherMaidenName">
+                        <label for="motherMaidenName">Mother's Maiden Name</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="number" id="age" name="age" min="18" max="100">
+                        <label for="age">Age</label>
+                    </div>
+                </div>
+            </section>
+            <section class="section-contact">
+                <h3><span class="icon"><img src="static/assets/contact_icon.png" alt="Contact Icon" style="width: 2em; vertical-align: middle;"></span><span style="color:#b90404;">*</span>CONTACT INFORMATION</h3> 
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="email" id="email" name="email">
+                        <label for="email">Email</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="tel" id="telephone" name="telephone">
+                        <label for="telephone">Phone Number</label>
+                    </div>
+                </div>
+            </section>
+            <section class="section-spouse">
+                <h3><span class="icon"><img src="static/assets/info_icon.png" alt="Personal Icon" style="width: 2em; vertical-align: middle;"></span> SPOUSE</h3>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="spouseLastName" name="spouseLastName">
+                        <label for="spouseLastName">Last Name</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="spouseFirstName" name="spouseFirstName">
+                        <label for="spouseFirstName">First Name</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="spouseMiddleName" name="spouseMiddleName">
+                        <label for="spouseMiddleName">Middle Name</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="date" id="spouseDob" name="spouseDob">
+                        <label for="spouseDob">Date of Birth</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="spouseProfession" name="spouseProfession">
+                        <label for="spouseProfession">Profession</label>
+                    </div>
+                </div>
+            </section>
+            <div class="form-actions">
+                <button type="button" class="cancel-btn">⟲ CANCEL</button>
+                <button type="submit" class="next-btn">NEXT</button>
+            </div>
+        </form>
+    </div>
+    <script src="static/js/registration.js"></script>
+</body>
+</html>
+
+
+
+
+#registration2.html#
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LBMS Portal - Registration (Step 2)</title>
+    <link rel="stylesheet" href="static/registration.css">
+</head>
+<body>
+    <div class="background-overlay">
+    </div>
+    <div class="container">
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-step completed">
+                <div class="step-number">1</div>
+                <div class="step-label">Personal Info</div>
+            </div>
+            <div class="progress-step active">
+                <div class="step-number">2</div>
+                <div class="step-label">Employment</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">3</div>
+                <div class="step-label">Additional</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">4</div>
+                <div class="step-label">Review</div>
+            </div>
+        </div>
+        <form id="registration2-form" class="profile-form">
+            <h2><span class="icon"><img src="static/assets/personal_icon.png" alt="Profile Icon" style="width: 1.3em; vertical-align: middle;"></span> CUSTOMER INFORMATION SHEET FOR INDIVIDUAL CUSTOMER</h2>
+            <hr style="border: 0; border-top: 1.5px solid #545454; margin: 10px 0 20px 0;">
+            <section class="section-employment">
+                <h3><span class="icon"><img src="static/assets/employment-icon.png" alt="Employment Icon" style="width: 2em; vertical-align: middle;"></span><span style="color:#b90404;">*</span>Employment Information</h3>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <select name="occupation" id="occupation" required>
+                            <option value="" disabled selected hidden>▼</option>
+                            <option value="Employed">Employed</option>
+                            <option value="Self-employed">Self-employed</option>
+                            <option value="OFW/Overseas Filipino">OFW/Overseas Filipino</option>
+                            <option value="Retired">Retired</option>
+                            <option value="Farmer/Fisher">Farmer/Fisher</option>
+                            <option value="Student/Minor">Student/Minor</option>
+                            <option value="Unemployed">Unemployed</option>
+                            <option value="Housewife">Housewife</option>
+                            <option value="Lawyers/Notary/Independent Legal Professional/Accountant">Lawyers/Notary/Independent Legal Professional/Accountant</option>
+                            <option value="Government Official">Government Official</option>
+                        </select>
+                        <label for="occupation">Occupation</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <select name="natureOfBusiness" id="natureOfBusiness" required>
+                            <option value="" disabled selected hidden>▼</option>
+                            <option value="1700">1700 - Private Household with Employed Persons</option>
+                            <option value="1800">1800 - Extra-territorial Organizations and Bodies</option>
+                            <option value="1204">1204 - Jewelry and Precious Stones Dealer</option>
+                            <option value="1005">1005 - Foreign Exchange Dealer Money Changer/ Remittance Agent</option>
+                            <option value="A0103">A0103 - Agriculture, Forestry, and Fishing</option>
+                            <option value="B0609">B0609 - Mining and Quarrying</option>
+                            <option value="C1033">C1033 - Manufacturing</option>
+                            <option value="D3500">D3500 - Electricity, Gas, Steam, and Air-conditioning Supply</option>
+                            <option value="E3639">E3639 - Water Supply, Sewerage, Waste Management and Remediation Activities </option>
+                            <option value="F4143">F4143 - Construction </option>
+                            <option value="G4547">G4547 - Wholesale and Retail Trade, Repair of Motor Vehicles and Motorcycles</option>
+                            <option value="H4953">H4953 - Transportation and Storage</option>
+                            <option value="I5556">I5556 - Accommodation and Food Service Activities</option>
+                            <option value="J5863">J5863 - Information and Communication</option>
+                            <option value="K6466">K6466 - Financial and Insurance Activities</option>
+                            <option value="L800">L800 - Real Estate Activities</option>
+                            <option value="M6975">M6975 - Professional, Scientific, and Technical Activities</option>
+                            <option value="N7782">N7782 - Administrative and Support Service Activities</option>
+                            <option value="O6400">O6400 - Public Administrative and Defense, Compulsory Social Security</option>
+                            <option value="P8500">P8500 - Education</option>
+                            <option value="Q8688">Q8688 - Human Health and Social Work Activities</option>
+                            <option value="R9093">R9093 - Arts, Entertainment, and Recreation</option>
+                            <option value="S9496">S9496 - Other Service Activities (Activities of Membership Organizations)</option>
+                            <option value="T9798">T9798 - Activities of Private Households as Employers and Undifferentiated Goods and Service and Producing Activities of Households for own use</option>
+                            <option value="U9900">U9900 - Activities of Extraterritorial Organizations, and Bodies </option>
+                            <option value="V0000">V0000 - Others</option>
+                            <option value="V0001">V0001 - Others - Student/Minor/Retiree/Pensioner</option>
+                            <option value="V0002">V0002 - Others - Unemployed/Housewife</option>
+                            <option value="9200">9200 - Gambling and Betting Activities</option>
+                            <option value="9210">9210 - OGOs and OGO Service Providers</option>
+                            <option value="9220">9220 - Casinos</option>
+                        </select>
+                        <label for="natureOfBusiness">Nature of Business/Economic Activity</label>
+                    </div>
+                </div>
+            </section>
+            <section class="section-employer">
+                <hr style="border: 0; border-top: 1.5px solid #545454; margin: 25px 0 25px 0;">
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="tinId" name="tinId">
+                        <label for="tinId">TIN ID</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="companyNameame" name="companyNameame">
+                        <label for="companyNameame">Company Name</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="employerAddress" name="employerAddress">
+                        <label for="employerAddress">Current Address (No./Street, Subd.,Brgy./District/Municipality/City/Province)</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="employerPhone" name="employerPhone">
+                        <label for="employerPhone">Phone/Fax Number</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="jobTitle" name="jobTitle">
+                        <label for="jobTitle">Job Title</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="date" id="employmentDate" name="employmentDate">
+                        <label for="employmentDate">Employment Date</label>
+                    </div>
+                </div>
+            </section>
+            <hr style="border: 0; border-top: 1.5px solid #545454; margin: 25px 0 25px 0;">
+            <section class="section-financial">
+                <h3><span class="icon"><img src="static/assets/finance-icon.png" alt="Financial Icon" style="width: 2em; vertical-align: middle;"></span><span style="color:#b90404;">*</span>Financial Record</h3>
+                <div class="row">
+                    <div class="form-group" style="flex:2;">
+                        <label style="font-family: Inter; font-size: 1rem; color: #184d3a; font-weight: 500; margin-bottom: 10px;">Source of Wealth <span style="font-size:0.9em; color:#737373;">(1-Primary, 2-Secondary, 3-Other Source)</span></label>
+                        <br>
+                        <br>
+                        <div class="checkbox-group" style="display: flex; font-family: Inter; font-size: 0.9em; flex-wrap: wrap; gap: 15px;">
+                            <label><input type="checkbox" name="sourceOfWealth" value="Salary/Honoraria"> Salary/Honoraria</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Interest/Commission"> Interest/Commission</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Business"> Business</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Pension"> Pension</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Regular Remittance"> Regular Remittance</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Other Remittance"> Other Remittance</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Donations/Inheritance"> Donations/Inheritance</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Allowance"> Allowance</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Professional Fees - Others"> Professional Fees - Others</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Professional Fees - Lawyers/Notary/Independent"> Professional Fees - Lawyers/Notary/Independent</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Grant/Scholarship/Awards/Prizes/Benefits"> Grant/Scholarship/Awards/Prizes/Benefits</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Royalties/Commission"> Royalties/Commission</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Sale of Assets"> Sale of Assets</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Loans"> Loans</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Government Appropriations"> Government Appropriations</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Fees and Charges"> Fees and Charges</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Taxes and Licenses"> Taxes and Licenses</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Others - with documents"> Others - with documents</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Others - without documents"> Others - without documents</label>
+                        </div>
+                    </div>
+                    <div class="row" style="gap: 10px; justify-content: flex-start;">
+                        <div class="floating-label-group" style="width: 300px;">
+                            <select name="monthlyIncome" id="monthlyIncome" required>
+                                <option value="" disabled selected hidden>▼</option>
+                                <option value="30000_and_below">Php 30,000.00 and below</option>
+                                <option value="30000_01_to_50000">Php 30,000.01-50,000.00</option>
+                                <option value="50000_01_to_100000">Php 50,000.01-100,000.00</option>
+                                <option value="100000_01_to_500000">Php 100,000.01-500,000.00</option>
+                                <option value="over_500000">Over Php 500,000.00</option>
+                            </select>
+                            <label for="monthlyIncome">Monthly Gross Income/Pension/Allowance</label>
+                        </div>
+                        <div class="floating-label-group" style="width: 300px;">
+                            <select name="annualIncome" id="annualIncome" required>
+                                <option value="" disabled selected hidden>▼</option>
+                                <option value="360000_and_below">Php 360,000.00 and below</option>
+                                <option value="360000_01_to_600000">Php 360,000.01-600,000.00</option>
+                                <option value="600000_01_to_1200000">Php 600,000.01-1,200,000.00</option>
+                                <option value="1200000_01_to_6000000">Php 1,200,000.01-6,000,000.00</option>
+                                <option value="over_6000000">Over Php 6,000,000.00</option>
+                            </select>
+                            <label for="annualIncome">Annual Gross Income/Pension/Allowance</label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <div class="form-actions">
+                <div class="left-buttons">
+                    <button type="button" class="cancel-btn">⟲ CANCEL</button>
+                </div>
+                <div class="right-buttons">
+                    <button type="button" class="back-btn">← BACK</button>
+                    <button type="submit" class="next-btn">NEXT</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <script src="static/js/registration.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const checkboxes = document.querySelectorAll('input[name="sourceOfWealth"]');
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', function() {
+                const checked = document.querySelectorAll('input[name="sourceOfWealth"]:checked');
+                if (checked.length > 3) {
+                    this.checked = false;
+                    alert('You can select up to three sources of wealth only.');
+                }
+            });
+        });
+    });
+    </script>
+</body>
+</html> 
+
+
+#regitration3.html#
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LBMS Portal - Registration (Step 3)</title>
+    <link rel="stylesheet" href="static/registration.css">
+</head>
+<body>
+    <div class="background-overlay"></div>
+    <div class="container">
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-step completed">
+                <div class="step-number">1</div>
+                <div class="step-label">Personal Info</div>
+            </div>
+            <div class="progress-step completed">
+                <div class="step-number">2</div>
+                <div class="step-label">Employment</div>
+            </div>
+            <div class="progress-step active">
+                <div class="step-number">3</div>
+                <div class="step-label">Additional</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">4</div>
+                <div class="step-label">Review</div>
+            </div>
+        </div>
+        <form id="registration3-form" class="profile-form">
+            <h2><span class="icon"><img src="static/assets/personal_icon.png" alt="Profile Icon" style="width: 1.3em; vertical-align: middle;"></span> CUSTOMER INFORMATION SHEET FOR INDIVIDUAL CUSTOMER</h2>
+            <hr style="border: 0; border-top: 1.5px solid #545454; margin: 10px 0 20px 0;">
+            <section>
+                <h3 style="margin-top:0.5em;">ADDITIONAL INFORMATION</h3>
+                <div id="depositor-entries">
+                    <div class="row depositor-entry">
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="depositorRole[]">
+                            <label>Depositor Role</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="companyName[]">
+                            <label>Company Name</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="add-btn" onclick="addDepositorEntry()">+ Add Depositor</button>
+            </section>
+            <section>
+                <h3>EXISTING BANK ACCOUNT</h3>
+                <div id="bank-entries">
+                    <div class="row bank-entry">
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="bank[]">
+                            <label>Bank</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="branch[]">
+                            <label>Branch</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="accountType[]">
+                            <label>Account Type</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="add-btn" onclick="addBankEntry()">+ Add Bank Account</button>
+            </section>
+            <section>
+                <h3>RELATIONSHIP TO OFFICIAL OF GOVERNMENT/INTERNATIONAL ORGANIZATION</h3>
+                <div id="relationship-entries">
+                    <div class="row relationship-entry">
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="govLastName[]">
+                            <label>Last Name</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="govFirstName[]">
+                            <label>First Name</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="govMiddleName[]">
+                            <label>Middle Name</label>
+                        </div>
+                    </div>
+                    <div class="row relationship-entry">
+                        <div class="floating-label-group">
+                            <select name="relationship[]">
+                                <option value="" disabled selected hidden>▼</option>
+                                <option value="Father">Father</option>
+                                <option value="Mother">Mother</option>
+                                <option value="Mother-in- Law">Mother-in-Law</option>
+                                <option value="Father-in-Law">Father-in-Law</option>
+                                <option value="Son">Son</option>
+                                <option value="Daughter">Daughter</option>
+                                <option value="Son-in-Law">Son-in-Law</option>
+                                <option value="Daughter-in-Law">Daughter-in-Law</option>
+                                <option value="Brother">Brother</option>
+                                <option value="Sister">Sister</option>
+                                <option value="Sibling">Sibling</option>
+                                <option value="Brother-in-Law">Brother-in-Law</option>
+                                <option value="Sister-in-Law">Sister-in-Law</option>
+                                <option value="Grandfather">Grandfather</option>
+                                <option value="Grandmother">Grandmother</option>
+                                <option value="Granddaughter">Granddaughter</option>
+                                <option value="Grandson">Grandson</option>
+                                <option value="Uncle">Uncle</option>
+                                <option value="Aunt">Aunt</option>
+                                <option value="Nephew">Nephew</option>
+                                <option value="Niece">Niece</option>
+                                <option value="Cousin">Cousin</option>
+                                <option value="Spouse">Spouse</option>
+                            </select>
+                            <label>Relationship</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="position[]">
+                            <label>Position</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="govBranchOrgName[]">
+                            <label>Government Branch/Organization Name</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="add-btn" onclick="addRelationshipEntry()">+ Add Relationship</button>
+            </section>
+            <div class="form-actions">
+                <div class="left-buttons">
+                    <button type="button" class="cancel-btn">⟲ CANCEL</button>
+                </div>
+                <div class="right-buttons">
+                    <button type="button" class="back-btn">← BACK</button>
+                    <button type="submit" class="next-btn">NEXT</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <script src="static/js/registration.js"></script>
+    <script>
+    // Dynamic Depositor Role/Company Name
+    function addDepositorEntry() {
+        const container = document.getElementById('depositor-entries');
+        const entries = container.querySelectorAll('.depositor-entry');
+        if (entries.length >= 3) return;
+        const clone = entries[0].cloneNode(true);
+        clone.querySelectorAll('input').forEach(input => input.value = '');
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.className = 'remove-btn';
+        removeBtn.onclick = function() { clone.remove(); };
+        clone.appendChild(removeBtn);
+        container.appendChild(clone);
+    }
+    // Dynamic Bank Account
+    function addBankEntry() {
+        const container = document.getElementById('bank-entries');
+        const entries = container.querySelectorAll('.bank-entry');
+        if (entries.length >= 3) return;
+        const clone = entries[0].cloneNode(true);
+        clone.querySelectorAll('input').forEach(input => input.value = '');
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.className = 'remove-btn';
+        removeBtn.onclick = function() { clone.remove(); };
+        clone.appendChild(removeBtn);
+        container.appendChild(clone);
+    }
+    // Dynamic Relationship
+    function addRelationshipEntry() {
+        const container = document.getElementById('relationship-entries');
+        const entries = container.querySelectorAll('.relationship-entry');
+        if (entries.length >= 6) return; // 2 rows per entry
+        // Clone both rows (name row and details row)
+        const nameRow = entries[0].cloneNode(true);
+        nameRow.querySelectorAll('input').forEach(input => input.value = '');
+        const detailsRow = entries[1].cloneNode(true);
+        detailsRow.querySelectorAll('input,select').forEach(input => input.value = '');
+        // Remove button
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.className = 'remove-btn';
+        removeBtn.onclick = function() { nameRow.remove(); detailsRow.remove(); };
+        detailsRow.appendChild(removeBtn);
+        container.appendChild(nameRow);
+        container.appendChild(detailsRow);
+    }
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+connect it into back end using Pyhon, app.py
+
+
+
+
+
+# Import the Flask class from the flask library
+from flask import Flask, render_template
+
+# Create an instance of the Flask class.
+# __name__ is a special Python variable that gets the name of the current module.
+# Because your 'templates' and 'static' folders are in the same directory as this
+# app.py file, Flask will find them automatically. We no longer need to specify
+# the template_folder or static_folder paths.
+app = Flask(__name__)
+
+# --- Page Routes ---
+# The following functions define the routes for our web application.
+# The @app.route decorator creates an association between the URL and the function.
+
+@app.route('/')
+def landing():
+    """Renders the landing page."""
+    # The render_template function finds and renders the specified HTML file
+    # from the 'templates' folder.
+    return render_template('landing.html')
+
+@app.route('/home')
+def home():
+    """Renders the home page."""
+    return render_template('home.html')
+
+@app.route('/about')
+def about():
+    """Renders the about page."""
+    return render_template('about.html')
+
+@app.route('/services')
+def services():
+    """Renders the services page."""
+    return render_template('services.html')
+
+@app.route('/contact')
+def contact():
+    """Renders the contact page."""
+    return render_template('contact.html')
+
+# --- Authentication/Registration Routes ---
+
+@app.route('/login')
+def login():
+    """Renders the login page."""
+    return render_template('login.html')
+
+@app.route('/register')
+def register():
+    """Renders the main register page."""
+    return render_template('register.html')
+
+@app.route('/registration1')
+def registration1():
+    """Renders the first step of the registration process."""
+    return render_template('registration1.html')
+
+@app.route('/registration2')
+def registration2():
+    """Renders the second step of the registration process."""
+    return render_template('registration2.html')
+
+@app.route('/registration3')
+def registration3():
+    """Renders the third step of the registration process."""
+    return render_template('registration3.html')
+
+@app.route('/registrationSuccess')
+def registration_success():
+    """Renders the registration success page."""
+    return render_template('registrationSuccess.html')
+
+@app.route('/registrationPrint')
+def registration_print():
+    """Renders the printable registration summary page."""
+    return render_template('registrationPrint.html')
+
+
+# --- Main execution block ---
+# This condition checks if the script is being run directly (not imported).
+if __name__ == '__main__':
+    # The app.run() method starts the development server.
+    # debug=True enables debug mode, which will automatically reload the server
+    # when you make changes to the code and show detailed error messages.
+    app.run(debug=True)
+
+
+
+
+

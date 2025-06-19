@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LBMS Portal - Registration Summary</title>
+  <link rel="stylesheet" href="static/registration.css" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
+</head>
+<body>
+  <div class="background-overlay"></div>
+  <div class="container">
+    <div class="progress-container">
+      <div class="progress-step completed"><div class="step-number">1</div><div class="step-label">Personal Info</div></div>
+      <div class="progress-step completed"><div class="step-number">2</div><div class="step-label">Employment</div></div>
+      <div class="progress-step completed"><div class="step-number">3</div><div class="step-label">Additional Info</div></div>
+      <div class="progress-step active"><div class="step-number">4</div><div class="step-label">Review</div></div>
+    </div>
+
+    <form id="registrationPrint-form" class="profile-form">
+      <h2>
+        <span class="icon"><img src="static/assets/personal_icon.png" alt="Profile Icon" style="width: 1.3em; vertical-align: middle;"></span>
+        REGISTRATION SUMMARY
+      </h2>
+      <hr style="border: 0; border-top: 1.5px solid #545454; margin: 10px 0 20px 0;" />
+
+      <section class="summary-section">
+        <h3><i class="fas fa-user"></i> Personal Information</h3>
+        <div class="summary-grid">
+          <div class="summary-item"><label>Full Name:</label><span id="fullName"></span></div>
+          <div class="summary-item"><label>Date of Birth:</label><span id="dob"></span></div>
+          <div class="summary-item"><label>Nationality:</label><span id="nationality"></span></div>
+          <div class="summary-item"><label>Civil Status:</label><span id="civilStatus"></span></div>
+          <div class="summary-item"><label>Address:</label><span id="address"></span></div>
+        </div>
+      </section>
+
+      <section class="summary-section">
+        <h3><i class="fas fa-briefcase"></i> Employment Information</h3>
+        <div class="summary-grid">
+          <div class="summary-item"><label>Occupation:</label><span id="occupation"></span></div>
+          <div class="summary-item"><label>Nature of Business:</label><span id="natureOfBusiness"></span></div>
+          <div class="summary-item"><label>Monthly Income:</label><span id="monthlyIncome"></span></div>
+          <div class="summary-item"><label>Annual Income:</label><span id="annualIncome"></span></div>
+        </div>
+      </section>
+
+      <section class="summary-section">
+        <h3><i class="fas fa-info-circle"></i> Additional Information</h3>
+        <div class="summary-grid">
+          <div class="summary-item"><label>Depositor Roles:</label><span id="depositorInfo"></span></div>
+          <div class="summary-item"><label>Bank Accounts:</label><span id="bankAccounts"></span></div>
+          <div class="summary-item"><label>Government Relations:</label><span id="govRelations"></span></div>
+        </div>
+      </section>
+
+      <section class="terms-section">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="termsCheck" required />
+          <label class="form-check-label" for="termsCheck">
+            I confirm that all information provided is accurate and complete. I understand that any false or misleading information may result in the rejection of my application.
+          </label>
+        </div>
+      </section>
+
+      <div class="form-actions">
+        <button type="button" class="cancel-btn back-btn">
+          <i class="fas fa-arrow-left"></i> BACK
+        </button>
+        <button type="button" class="submit-btn"
+          onclick="document.getElementById('registrationPrint-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))">
+          <i class="fas fa-check"></i> SUBMIT
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const r1 = JSON.parse(sessionStorage.getItem('registration1-form') || '{}');
+      const r2 = JSON.parse(sessionStorage.getItem('registration2-form') || '{}');
+      const r3 = JSON.parse(sessionStorage.getItem('registration3-form') || '{}');
+
+      // Mapping for Nature of Business values to descriptions
+      const natureOfBusinessMap = {
+          "1700": "1700 - Private Household with Employed Persons",
+          "1800": "1800 - Extra-territorial Organizations and Bodies",
+          "1204": "1204 - Jewelry and Precious Stones Dealer",
+          "1005": "1005 - Foreign Exchange Dealer Money Changer/ Remittance Agent",
+          "A0103": "A0103 - Agriculture, Forestry, and Fishing",
+          "B0609": "B0609 - Mining and Quarrying",
+          "C1033": "C1033 - Manufacturing",
+          "D3500": "D3500 - Electricity, Gas, Steam, and Air-conditioning Supply",
+          "E3639": "E3639 - Water Supply, Sewerage, Waste Management and Remediation Activities",
+          "F4143": "F4143 - Construction",
+          "G4547": "G4547 - Wholesale and Retail Trade, Repair of Motor Vehicles and Motorcycles",
+          "H4953": "H4953 - Transportation and Storage",
+          "I5556": "I5556 - Accommodation and Food Service Activities",
+          "J5863": "J5863 - Information and Communication",
+          "K6466": "K6466 - Financial and Insurance Activities",
+          "L800": "L800 - Real Estate Activities",
+          "M6975": "M6975 - Professional, Scientific, and Technical Activities",
+          "N7782": "N7782 - Administrative and Support Service Activities",
+          "O6400": "O6400 - Public Administrative and Defense, Compulsory Social Security",
+          "P8500": "P8500 - Education",
+          "Q8688": "Q8688 - Human Health and Social Work Activities",
+          "R9093": "R9093 - Arts, Entertainment, and Recreation",
+          "S9496": "S9496 - Other Service Activities (Activities of Membership Organizations)",
+          "T9798": "T9798 - Activities of Private Households as Employers and Undifferentiated Goods and Service and Producing Activities of Households for own use",
+          "U9900": "U9900 - Activities of Extraterritorial Organizations, and Bodies",
+          "V0000": "V0000 - Others",
+          "V0001": "V0001 - Others - Student/Minor/Retiree/Pensioner",
+          "V0002": "V0002 - Others - Unemployed/Housewife",
+          "9200": "9200 - Gambling and Betting Activities"
+      };
+
+      // Mapping for Monthly Income values to descriptions
+      const monthlyIncomeMap = {
+          "30000_and_below": "Php 30,000.00 and below",
+          "30000_01_to_50000": "Php 30,000.01-50,000.00",
+          "50000_01_to_100000": "Php 50,000.01-100,000.00",
+          "100000_01_to_500000": "Php 100,000.01-500,000.00",
+          "over_500000": "Over Php 500,000.00"
+      };
+
+      // Mapping for Annual Income values to descriptions
+      const annualIncomeMap = {
+          "360000_and_below": "Php 360,000.00 and below",
+          "360000_01_to_600000": "Php 360,000.01-600,000.00",
+          "600000_01_to_1200000": "Php 600,000.01-1,200,000.00",
+          "1200000_01_to_6000000": "Php 1,200,000.01-6,000,000.00",
+          "over_6000000": "Over Php 6,000,000.00"
+      };
+
+      document.getElementById('fullName').textContent = `${r1.firstName || ''} ${r1.lastName || ''}`;
+      document.getElementById('dob').textContent = r1.dob || '';
+      document.getElementById('nationality').textContent = r1.nationality || '';
+      document.getElementById('civilStatus').textContent = r1.civilStatus || '';
+      document.getElementById('address').textContent = r1.address || '';
+
+      document.getElementById('occupation').textContent = r2.occupation || '';
+      document.getElementById('natureOfBusiness').textContent = natureOfBusinessMap[r2.natureOfBusiness] || r2.natureOfBusiness || '';
+      document.getElementById('monthlyIncome').textContent = monthlyIncomeMap[r2.monthlyIncome] || r2.monthlyIncome || '';
+      document.getElementById('annualIncome').textContent = annualIncomeMap[r2.annualIncome] || r2.annualIncome || '';
+
+      // --- Functions to count meaningful entries ---
+
+      /**
+       * Counts meaningful depositor entries.
+       * An entry is considered meaningful if its 'depositorRole' or 'companyName' is not empty.
+       * Assumes depositorArray items are objects with 'depositorRole' and 'companyName' properties.
+       */
+      function countDepositorEntries(depositorArray) {
+          if (!Array.isArray(depositorArray)) {
+              return 0;
+          }
+          return depositorArray.filter(d => 
+              d && (String(d.depositorRole || '').trim() !== '' || String(d.companyName || '').trim() !== '')
+          ).length;
+      }
+
+      /**
+       * Counts meaningful bank account entries.
+       * An entry is considered meaningful if its 'bank_name' property is not empty.
+       * Assumes bankArray items are objects with a 'bank_name' property.
+       */
+      function countBankAccounts(bankArray) {
+          if (!Array.isArray(bankArray)) {
+              return 0; // Not an array, so no accounts
+          }
+          // Filter out entries where 'bank_name' is null, undefined, or an empty string after trimming whitespace
+          return bankArray.filter(bank => bank && String(bank.bank_name || '').trim() !== '').length;
+      }
+
+      /**
+       * Counts meaningful public official relationship entries.
+       * An entry is considered meaningful if its 'gov_int_name' property is not empty.
+       * Assumes relArray items are objects with a 'gov_int_name' property.
+       */
+      function countGovRelations(relArray) {
+          if (!Array.isArray(relArray)) {
+              return 0; // Not an array, so no relations
+          }
+          // Filter out entries where 'gov_int_name' is null, undefined, or an empty string after trimming whitespace
+          return relArray.filter(rel => rel && String(rel.gov_int_name || '').trim() !== '').length;
+      }
+
+      // --- Apply counts to the display ---
+      const depositorCount = countDepositorEntries(r3.depositor);
+      const bankCount = countBankAccounts(r3.bank);
+      const govRelCount = countGovRelations(r3.relationship);
+
+      document.getElementById('depositorInfo').textContent = depositorCount > 0 ? `${depositorCount} role(s) listed` : 'None';
+      document.getElementById('bankAccounts').textContent = bankCount > 0 ? `${bankCount} account(s) listed` : 'None';
+      document.getElementById('govRelations').textContent = govRelCount > 0 ? `${govRelCount} relation(s) listed` : 'None';
+    });
+  </script>
+
+  <script src="static/js/registration.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

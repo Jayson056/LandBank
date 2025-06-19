@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Services - Landbank CIMS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="static/landing.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cedarville+Cursive&family=Fredoka:wght@300..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Orbitron:wght@400..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    <style>
+        .services-section {
+            padding: 100px 0;
+            color: #fff;
+        }
+        .service-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            height: 100%;
+            transition: transform 0.3s ease;
+        }
+        .service-card:hover {
+            transform: translateY(-5px);
+        }
+        .service-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #217a6b;
+        }
+        .service-features {
+            background: rgba(8, 71, 52, 0.9);
+            padding: 50px 0;
+            margin: 50px 0;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        .feature-list li {
+            margin-bottom: 15px;
+            padding-left: 30px;
+            position: relative;
+        }
+        .feature-list li:before {
+            content: '\f00c';
+            font-family: 'Font Awesome 5 Free';
+            font-weight: 900;
+            position: absolute;
+            left: 0;
+            color: #217a6b;
+        }
+    </style>
+</head>
+<body>
+    <div class="background-overlay"></div>
+
+    <!-- Navbar -->
+    <header class="navbar">
+        <div class="navbar-left">
+            <img src="static/assets/LANDBANK.png" alt="Landbank Logo" class="navbar-logo">
+            <span class="navbar-title">LBMS PORTAL</span>
+        </div>
+        <nav class="navbar-links">
+            <a href="/">HOME</a> 
+            <a href="about">ABOUT</a>
+            <a href="services.html"class="active">SERVICES</a>
+            <a href="contact">CONTACT</a>
+        </nav>
+    </header>
+
+    <!-- Services Section -->
+    <section class="services-section">
+        <div class="container">
+            <div class="row mb-5">
+                <div class="col-12 text-center">
+                    <h1 class="display-4 mb-4" style="font-family: Aristotelica; font-size: 5em; padding-top: 5%">Services</h1>
+                    <p class="lead">Comprehensive financial solutions for individuals and businesses</p>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="service-card card-hover">
+                        <div class="card-image" style="background-image: url('https://www.landbank.com/images/inner_template/1706177672_Thumbnail-3-Cards.png');"></div>
+                        <div class="card-content">
+                            <i class="fas fa-university service-icon"></i> 
+                            <h3 style="font-family: Aristotelica;">Banking Services</h3>
+                            <p>Comprehensive banking solutions including savings accounts, checking accounts, and time deposits.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="service-card card-hover">
+                        <div class="card-image" style="background-image: url('https://media.licdn.com/dms/image/v2/D5622AQFabzS03NxcPg/feedshare-shrink_800/B56ZO9MqVvG4Ag-/0/1734046046448?e=2147483647&v=beta&t=gKwPhYUWiUeFLJuaepV_jBYQ2e2FbRNwnwm2sSLD4vs');"></div>
+                        <div class="card-content">
+                            <i class="fas fa-hand-holding-usd service-icon"></i>  
+                            <h3 style="font-family: Aristotelica;">Loans & Credit</h3>
+                            <p>Personal loans, business loans, and agricultural loans with competitive interest rates.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="service-card card-hover">
+                        <div class="card-image" style="background-image: url('https://www.landbank.com/images/news_awards/1744696957_PR%20Photo%20-%20Digital%20Banking%20Performance%202024%20(1).jpg');"></div>
+                        <div class="card-content">
+                            <i class="fas fa-mobile-alt service-icon"></i> 
+                            <h3 style="font-family: Aristotelica;">Digital Banking</h3>
+                            <p>24/7 access to banking services through our secure online and mobile platforms.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="service-features">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card-hover">
+                        <div class="card-image" style="background-image: url(static/assets/features.jpg');"></div>
+                        <div class="card-content">
+                            <h2 class="mb-4"style="font-family: Aristotelica;"> Key Features </h2>
+                            <ul class="feature-list">
+                                <li>Secure online banking platform</li>
+                                <li>Mobile banking app with biometric authentication</li>
+                                <li>24/7 customer support</li>
+                                <li>Automated bill payments</li>
+                                <li>Real-time transaction monitoring</li>
+                                <li>Investment opportunities</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card-hover">
+                        <div class="card-image" style="background-image: url(static/assets/benefits.jpg');"></div>
+                        <div class="card-content">
+                            <h2 class="mb-4" style="font-family: Aristotelica;">Benefits</h2>
+                            <ul class="feature-list">
+                                <li>Competitive interest rates</li>
+                                <li>Flexible payment terms</li>
+                                <li>Nationwide branch network</li>
+                                <li>Expert financial advice</li>
+                                <li>Special programs for farmers and fisherfolk</li>
+                                <li>Government-backed security</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Bootstrap JS and Popper.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

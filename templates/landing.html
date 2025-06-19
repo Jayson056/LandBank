@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Landbank - Customer Information Management System</title>
+  <link rel="stylesheet" href="static/landing.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cedarville+Cursive&family=Fredoka:wght@300..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Orbitron:wght@400..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+  <div class="background-overlay">
+    <video autoplay loop muted playsinline id="background-video">
+      <source src="static/assets/aerial-shot-LANDBANK.mp4" type="video/mp4"> 
+      Your browser does not support the video tag.
+    </video>
+  </div>
+  <header class="navbar">
+    <div class="navbar-left">
+      <img src="static/assets/LANDBANK.png" alt="Landbank Logo" class="navbar-logo">
+      <span class="navbar-title">LBMS PORTAL</span>
+    </div>
+    <nav class="navbar-links">
+      <a href="landing.html" class="active">HOME</a>
+      <a href="about">ABOUT</a>
+      <a href="services">SERVICES</a>
+      <a href="contact">CONTACT</a>
+    </nav>
+  </header>
+  <main class="main-content">
+    <div class="center-content">
+      <div class="subtitle">LANDBANK MANAGEMENT SYSTEM</div>
+      <img src="static/assets/LANDBANK.png" alt="Landbank Logo" class="main-logo">
+      <h1 class="portal-title">LBMS PORTAL</h1>
+      <div class="button-group">
+        <button class="register-btn"><i class="fas fa-user-plus"></i> REGISTER</button>
+        <button class="login-btn"><i class="fas fa-sign-in-alt"></i> LOG IN</button>
+      </div>
+      <div class="socials">
+        <a href="https://www.facebook.com/landbankofficial" target="_blank" rel="noopener noreferrer">
+          <img src="static/assets/facebook-logo.png" alt="Facebook" class="Facebook-logo" style="width: 35px; margin-bottom: 10px;">
+          </a>
+    
+        <a href="https://x.com/LBP_Official?s=09" target="_blank" rel="noopener noreferrer">
+          <img src="static/assets/twitter-logo.png" alt="Twitter" class="twitter-logo"style="width: 50px; margin-bottom: 10px; margin-right: 5%; margin-left: 9%;">
+        </a>
+        <a href="https://www.linkedin.com/company/land-bank-of-the-philippines-official/?originalSubdomain=ph" target="_blank" rel="noopener noreferrer">
+          <img src="static/assets/linkedin-logo.png" alt="LinkedIn" style="width: 35px; margin-bottom: 10px; margin-right: 5%;">
+        </a>
+        <a href="https://www.instagram.com/landbankofficial/?hl=en" target="_blank" rel="noopener noreferrer">
+          <img src="static/assets/instagram-logo.png" alt="Instagram" style="width: 35px; margin-bottom: 10px; margin-right: 5%;">
+        </a>
+      </div>
+    </div>
+  </main>
+  <!-- Add this inside <script> at the end of body in landing.html -->
+    <script>
+      document.querySelector('.register-btn').onclick = () => window.location.href = 'register';
+      document.querySelector('.login-btn').onclick = () => window.location.href = 'login';
+    </script>  
+</body>
+</html>

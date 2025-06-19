@@ -1,0 +1,2248 @@
+app.py
+
+# Import necessary libraries
+from flask import Flask, render_template, request, redirect, url_for, session
+import mysql.connector # Import mysql.connector
+
+# Create a Flask app instance
+app = Flask(__name__)
+# IMPORTANT: Change this secret key in production! It's used for session security.
+app.secret_key = 'your_strong_secret_key_here_for_production'
+
+# Database configuration
+db_config = {
+    'host': '127.0.0.1', # Use 127.0.0.1 for local MySQL, or your database host
+    'port': '3306',
+    'user': 'root',
+    'password': 'LandBank@2025', # Your MySQL root password
+    'database': 'database_landbank'
+}
+
+def get_db_connection():
+    """Establishes and returns a database connection using mysql.connector."""
+    try:
+        conn = mysql.connector.connect(**db_config)
+        return conn
+    except mysql.connector.Error as err:
+        print(f"Error connecting to database: {err}")
+        return None
+
+# --- Function to Ensure Database Schema (for development/initial setup) ---
+def _ensure_database_schema():
+    """
+    Ensures that necessary database columns have appropriate lengths.
+    This function should typically be run only once, or managed by a proper migration tool.
+    For development, it runs on app startup.
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            print("Failed to get database connection for schema update.")
+            return
+
+        cursor = conn.cursor()
+        print("Attempting to ensure database schema (column lengths)...")
+
+        # Increase length for relation_desc in cust_po_relationship
+        try:
+            cursor.execute("ALTER TABLE cust_po_relationship MODIFY COLUMN relation_desc VARCHAR(255);")
+            print("Successfully altered 'relation_desc' column.")
+        except mysql.connector.Error as err:
+            # Error Code 1060: Duplicate column name (or already exists with same type)
+            if err.errno == 1060 or "Duplicate column name" in str(err) or "Can't create table" in str(err) or "already exists" in str(err):
+                 print(f"Column 'relation_desc' likely already exists or schema is already updated: {err}")
+            else:
+                print(f"Error altering 'relation_desc' column: {err}")
+                conn.rollback() # Rollback any partial changes if an error occurs
+                return # Exit if a critical error occurred
+
+        # Increase length for mon_income and ann_income in financial_record
+        try:
+            cursor.execute("ALTER TABLE financial_record MODIFY COLUMN mon_income VARCHAR(255);")
+            print("Successfully altered 'mon_income' column.")
+        except mysql.connector.Error as err:
+            if err.errno == 1060 or "Duplicate column name" in str(err) or "Can't create table" in str(err) or "already exists" in str(err):
+                 print(f"Column 'mon_income' likely already exists or schema is already updated: {err}")
+            else:
+                print(f"Error altering 'mon_income' column: {err}")
+                conn.rollback()
+                return
+
+        try:
+            cursor.execute("ALTER TABLE financial_record MODIFY COLUMN ann_income VARCHAR(255);")
+            print("Successfully altered 'ann_income' column.")
+        except mysql.connector.Error as err:
+            if err.errno == 1060 or "Duplicate column name" in str(err) or "Can't create table" in str(err) or "already exists" in str(err):
+                 print(f"Column 'ann_income' likely already exists or schema is already updated: {err}")
+            else:
+                print(f"Error altering 'ann_income' column: {err}")
+                conn.rollback()
+                return
+
+        conn.commit()
+        print("Database schema update attempt finished.")
+
+    except Exception as e:
+        print(f"An unexpected error occurred during schema update: {e}")
+        if conn:
+            conn.rollback()
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+# --- Page Routes ---
+@app.route('/')
+def landing():
+    """Renders the landing page."""
+    return render_template('landing.html')
+
+@app.route('/home')
+def home():
+    """Renders the home page."""
+    return render_template('home.html')
+
+@app.route('/about')
+def about():
+    """Renders the about page."""
+    return render_template('about.html')
+
+@app.route('/services')
+def services():
+    """Renders the services page."""
+    return render_template('services.html')
+
+@app.route('/contact')
+def contact():
+    """Renders the contact page."""
+    return render_template('contact.html')
+
+@app.route('/registrationPrint')
+def registrationPrint():
+    """Renders the registration print/summary page."""
+    return render_template('registrationPrint.html')
+
+@app.route('/register')
+def register():
+    """Renders the registration page (initial entry point)."""
+    return render_template('register.html')
+
+# --- Registration Flow Pages (GET requests only, data handled by JS) ---
+# These routes are now strictly GET to render HTML templates.
+# Data collection and navigation logic is managed by registration.js on the client-side,
+# and then submitted all at once to /submitRegistration.
+@app.route('/registration1', methods=['GET'])
+def registration1():
+    """Renders the first step of the registration form."""
+    return render_template('registration1.html')
+
+@app.route('/registration2', methods=['GET'])
+def registration2():
+    """Renders the second step of the registration form."""
+    return render_template('registration2.html')
+
+@app.route('/registration3', methods=['GET'])
+def registration3():
+    """Renders the third step of the registration form."""
+    return render_template('registration3.html')
+
+
+@app.route('/submitRegistration', methods=['POST'])
+def submit_registration():
+    """
+    Receives all registration data as JSON from the frontend (registration.js)
+    and handles the complete database insertion, including credentials.
+    """
+    conn = None
+    cursor = None
+    try:
+        # Get JSON data sent from the frontend
+        data = request.get_json()
+        r1 = data.get('registration1', {}) # Data from step 1
+        r2 = data.get('registration2', {}) # Data from step 2
+        r3 = data.get('registration3', {}) # Data from step 3
+
+        conn = get_db_connection() # Use the consistent connection function
+        if not conn:
+            raise Exception("Database connection failed")
+        
+        cursor = conn.cursor()
+        conn.start_transaction() # Start a transaction for atomicity
+
+        # --- 1. Insert into occupation table ---
+        occ_type = r2.get('occupation')
+        bus_nature = r2.get('natureOfBusiness')
+        sql_occ = "INSERT INTO occupation (occ_type, bus_nature) VALUES (%s, %s)"
+        cursor.execute(sql_occ, (occ_type, bus_nature))
+        occ_id = cursor.lastrowid
+
+        # --- 2. Insert into financial_record table ---
+        # Handle sourceOfWealth, which can be a list if multiple checkboxes selected
+        source_wealth_list = r2.get('sourceOfWealth', [])
+        source_wealth = ', '.join(source_wealth_list) if isinstance(source_wealth_list, list) else source_wealth_list
+        
+        mon_income = r2.get('monthlyIncome')
+        ann_income = r2.get('annualIncome')
+        sql_fin = "INSERT INTO financial_record (source_wealth, mon_income, ann_income) VALUES (%s, %s, %s)"
+        cursor.execute(sql_fin, (source_wealth, mon_income, ann_income))
+        fin_code = cursor.lastrowid
+
+        # --- 3. Insert into customer table ---
+        custname = f"{r1.get('firstName', '')} {r1.get('lastName', '')}"
+        sql_cust = """INSERT INTO customer (custname, datebirth, nationality, citizenship, custsex, placebirth, civilstatus, num_children, mmaiden_name, cust_address, email_address, contact_no, occ_id, fin_code)
+                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+        customer_data = (
+            custname, r1.get('dob'), r1.get('nationality'), r1.get('citizenship'),
+            r1.get('sex'), r1.get('placeOfBirth'), r1.get('civilStatus'),
+            int(r1.get('children', 0) or 0), # Ensure num_children is int, handle empty string to 0
+            r1.get('motherMaidenName'), r1.get('address'),
+            r1.get('email'), r1.get('telephone'), occ_id, fin_code
+        )
+        cursor.execute(sql_cust, customer_data)
+        cust_no = cursor.lastrowid # Get the newly generated customer ID from AUTO_INCREMENT
+
+        # --- 4. Insert into employer_details and employment_details if applicable ---
+        if occ_type == 'Employed':
+            tin_id = r2.get('tinId', '')
+            empname = r2.get('companyName', '')
+            emp_address = r2.get('employerAddress', '')
+            phonefax_no = r2.get('employerPhone', '')
+            job_title = r2.get('jobTitle', '')
+            emp_date = r2.get('employmentDate', '2000-01-01') # Default date if not provided
+
+            sql_emp_details = "INSERT INTO employer_details (tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s)"
+            cursor.execute(sql_emp_details, (tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
+            emp_id = cursor.lastrowid
+
+            sql_emp_link = "INSERT INTO employment_details (cust_no, emp_id) VALUES (%s, %s)"
+            cursor.execute(sql_emp_link, (cust_no, emp_id))
+
+        # --- 5. Insert into spouse table if married ---
+        if r1.get('civilStatus') == 'Married' and r1.get('spouseFirstName'):
+            sp_name = f"{r1.get('spouseFirstName', '')} {r1.get('spouseLastName', '')}"
+            sp_datebirth = r1.get('spouseDob')
+            sp_profession = r1.get('spouseProfession')
+            sql_spouse = "INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession) VALUES (%s, %s, %s, %s)"
+            cursor.execute(sql_spouse, (cust_no, sp_name, sp_datebirth, sp_profession))
+
+        # --- 6. Insert into company_affiliation ---
+        roles = r3.get('depositorRole', [])
+        companies = r3.get('companyName', [])
+        # Ensure these are lists to prevent errors in zip
+        if not isinstance(roles, list): roles = [roles] if roles else []
+        if not isinstance(companies, list): companies = [companies] if companies else []
+
+        for role, company in zip(roles, companies):
+            if role and company: # Only insert if both role and company are provided
+                sql_comp_aff = "INSERT INTO company_affiliation (cust_no, depositor_role, dep_compname) VALUES (%s, %s, %s)"
+                cursor.execute(sql_comp_aff, (cust_no, role, company))
+
+        # --- 7. Insert into bank_details and existing_bank ---
+        banks = r3.get('bank', [])
+        branches = r3.get('branch', [])
+        acc_types = r3.get('accountType', [])
+        # Ensure these are lists to prevent errors in zip
+        if not isinstance(banks, list): banks = [banks] if banks else []
+        if not isinstance(branches, list): branches = [branches] if branches else []
+        if not isinstance(acc_types, list): acc_types = [acc_types] if acc_types else []
+
+        for bank_name, branch, acc_type in zip(banks, branches, acc_types):
+            if bank_name and branch and acc_type: # Only insert if all fields are provided
+                # Use INSERT IGNORE to prevent errors if bank_details already exists
+                sql_insert_bank = "INSERT IGNORE INTO bank_details (bank_code, bank_name, branch) VALUES (%s, %s, %s)"
+                # Using bank_name as bank_code for simplicity. In a real app, bank_code might be separate.
+                cursor.execute(sql_insert_bank, (bank_name, bank_name, branch)) 
+                
+                sql_existing_bank = "INSERT INTO existing_bank (cust_no, bank_code, acc_type) VALUES (%s, %s, %s)"
+                cursor.execute(sql_existing_bank, (cust_no, bank_name, acc_type)) # bank_name used as bank_code
+
+        # --- 8. Insert into public_official_details and cust_po_relationship ---
+        gov_last_names = r3.get('govLastName', [])
+        gov_first_names = r3.get('govFirstName', [])
+        relationships = r3.get('relationship', [])
+        positions = r3.get('position', [])
+        org_names = r3.get('govBranchOrgName', [])
+        
+        # Ensure these are lists to prevent errors in loop
+        if not isinstance(gov_last_names, list): gov_last_names = [gov_last_names] if gov_last_names else []
+        if not isinstance(gov_first_names, list): gov_first_names = [gov_first_names] if gov_first_names else []
+        if not isinstance(relationships, list): relationships = [relationships] if relationships else []
+        if not isinstance(positions, list): positions = [positions] if positions else []
+        if not isinstance(org_names, list): org_names = [org_names] if org_names else []
+
+        # Iterate using the shortest list length to avoid index errors if lists are mismatched
+        min_len = min(len(gov_last_names), len(gov_first_names), len(relationships), len(positions), len(org_names))
+        for i in range(min_len):
+            # Only insert if all related fields are present for a valid entry
+            if gov_last_names[i] and gov_first_names[i] and relationships[i] and positions[i] and org_names[i]:
+                gov_name = f"{gov_first_names[i]} {gov_last_names[i]}"
+                sql_po_details = "INSERT INTO public_official_details (gov_int_name, official_position, branch_orgname) VALUES (%s, %s, %s)"
+                cursor.execute(sql_po_details, (gov_name, positions[i], org_names[i]))
+                gov_int_id = cursor.lastrowid
+
+                sql_po_rel = "INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc) VALUES (%s, %s, %s)"
+                cursor.execute(sql_po_rel, (cust_no, gov_int_id, relationships[i]))
+
+        # --- 9. NEW: Call insert_credentials here to save username and password ---
+        insert_credentials(cursor, cust_no, r1) # r1 contains the 'email' for username
+
+        conn.commit() # Commit the transaction if all insertions are successful
+        return '', 200 # Return success status (HTTP 200 OK)
+
+    except mysql.connector.Error as err:
+        if conn:
+            conn.rollback() # Rollback on database error to ensure data consistency
+        print(f"Error during registration submission: {err}")
+        # Return a more informative error to the frontend for debugging
+        return f"Database error during submission: {err}", 500 
+    except Exception as e:
+        if conn:
+            conn.rollback() # Rollback on unexpected error
+        print(f"Unexpected error during registration submission: {e}")
+        return f"An unexpected error occurred: {e}", 500 
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+# --- Helper Function Definitions (Called from submit_registration) ---
+def insert_credentials(cursor, cust_no, data):
+    """
+    Inserts user credentials (username and generated password) into the credentials table.
+    """
+    username = data.get('email')
+    # Generate password based on user's request (e.g., 'defaultPass' + cust_no)
+    # IMPORTANT: In a real application, you MUST hash passwords using a strong library (e.g., bcrypt).
+    password = f"defaultPass{cust_no}" 
+
+    sql = """
+        INSERT INTO credentials (cust_no, username, password)
+        VALUES (%s, %s, %s)
+    """
+    cursor.execute(sql, (cust_no, username, password))
+
+
+@app.route('/registrationSuccess')
+def registration_success():
+    """Renders the registration success page."""
+    return render_template('registrationSuccess.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('username')
+        password_input = request.form.get('password')
+
+        # --- Admin login check ---
+        if email == 'admin@gmail.com' and password_input == 'LandBank@2025':
+            session['admin'] = True
+            session['user_email'] = email
+            return redirect('/admin_dashboard')
+
+        # --- Regular user login check ---
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            if not conn:
+                return render_template('login.html', error='Database connection failed.')
+
+            cursor = conn.cursor(dictionary=True) # Use dictionary=True for easy column access
+
+            # Query credentials table to find user and join with customer to get name
+            cursor.execute("""
+                SELECT credentials.cust_no, username, password, customer.custname
+                FROM credentials
+                JOIN customer ON credentials.cust_no = customer.cust_no
+                WHERE username = %s
+            """, (email,))
+            user = cursor.fetchone()
+
+            # Verify password (IMPORTANT: In production, compare hashed passwords)
+            if user and user['password'] == password_input: # Current comparison is plain text as per password generation
+                session['user'] = user['custname']
+                session['user_email'] = user['username']
+                session['cust_no'] = user['cust_no']
+                
+                # Redirect to userHome.html upon successful login
+                return redirect('/userHome') 
+            else:
+                return render_template('login.html', error='Invalid email or password.')
+
+        except mysql.connector.Error as db_err:
+            print(f"Login DB Error: {db_err}")
+            return render_template('login.html', error='Database error during login.')
+
+        except Exception as e:
+            print(f"Unexpected login error: {e}")
+            return render_template('login.html', error='An unexpected error occurred during login.')
+
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    # Render login page for GET request
+    return render_template('login.html')
+
+@app.route('/userHome')
+def userHome():
+    """
+    Renders the user's home dashboard, displaying their account details.
+    Fetches comprehensive user data from various linked tables.
+    """
+    if 'user' not in session or 'cust_no' not in session:
+        # If user is not logged in, redirect to login page
+        return redirect(url_for('login'))
+
+    cust_no = session['cust_no']
+    user_data = {}
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        if not conn:
+            raise Exception("Database connection failed")
+        
+        cursor = conn.cursor(dictionary=True) # Use dictionary=True for easier data access by column name
+
+        # Fetch Customer details
+        cursor.execute("SELECT * FROM customer WHERE cust_no = %s", (cust_no,))
+        user_data['customer'] = cursor.fetchone()
+        if not user_data['customer']:
+            # Customer not found, clear session and redirect to login
+            session.clear()
+            return redirect(url_for('login'))
+
+        # Fetch Occupation details
+        occ_id = user_data['customer'].get('occ_id')
+        if occ_id:
+            cursor.execute("SELECT * FROM occupation WHERE occ_id = %s", (occ_id,))
+            user_data['occupation'] = cursor.fetchone()
+        else:
+            user_data['occupation'] = {}
+
+        # Fetch Financial Record details
+        fin_code = user_data['customer'].get('fin_code')
+        if fin_code:
+            cursor.execute("SELECT * FROM financial_record WHERE fin_code = %s", (fin_code,))
+            user_data['financial_record'] = cursor.fetchone()
+        else:
+            user_data['financial_record'] = {}
+        
+        # Fetch Spouse details (if civil status is Married)
+        if user_data['customer'].get('civilstatus') == 'Married':
+            cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (cust_no,))
+            user_data['spouse'] = cursor.fetchone()
+        else:
+            user_data['spouse'] = None # Explicitly set to None if not married
+
+        # Fetch Employer Details (via employment_details if exists)
+        user_data['employer_details'] = None # Default to None
+        cursor.execute("SELECT emp_id FROM employment_details WHERE cust_no = %s", (cust_no,))
+        emp_link = cursor.fetchone()
+        if emp_link and emp_link['emp_id']:
+            cursor.execute("SELECT * FROM employer_details WHERE emp_id = %s", (emp_link['emp_id'],))
+            user_data['employer_details'] = cursor.fetchone()
+
+        # Fetch Company Affiliations
+        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (cust_no,))
+        user_data['company_affiliations'] = cursor.fetchall()
+        
+        # Fetch Existing Bank Accounts (and their associated bank details)
+        sql_existing_banks = """
+            SELECT eb.acc_type, bd.bank_name, bd.branch 
+            FROM existing_bank eb
+            JOIN bank_details bd ON eb.bank_code = bd.bank_code
+            WHERE eb.cust_no = %s
+        """
+        cursor.execute(sql_existing_banks, (cust_no,))
+        user_data['existing_banks'] = cursor.fetchall()
+
+        # Fetch Public Official Relationships
+        sql_po_relationships = """
+            SELECT cpr.relation_desc, pod.gov_int_name, pod.official_position, pod.branch_orgname
+            FROM cust_po_relationship cpr
+            JOIN public_official_details pod ON cpr.gov_int_id = pod.gov_int_id
+            WHERE cpr.cust_no = %s
+        """
+        cursor.execute(sql_po_relationships, (cust_no,))
+        user_data['public_official_relationships'] = cursor.fetchall()
+
+
+        return render_template('userHome.html', user_data=user_data)
+
+    except mysql.connector.Error as err:
+        print(f"DB error fetching user home data: {err}")
+        return "Database error while loading your profile.", 500
+    except Exception as e:
+        print(f"Unexpected error fetching user home data: {e}")
+        return "An unexpected error occurred while loading your profile.", 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+@app.route('/admin_dashboard')
+def admin_dashboard():
+    # Only allow access if admin is logged in
+    if 'admin' not in session:
+        return redirect('/login')
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            raise Exception("Database connection failed")
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT c.cust_no, c.custname, c.email_address, c.contact_no
+            FROM customer c
+            ORDER BY c.cust_no DESC
+        """)
+        customers = cursor.fetchall()
+
+        return render_template('admin_dashboard.html', customers=customers)
+
+    except mysql.connector.Error as err:
+        print(f"DB error in admin_dashboard: {err}")
+        return "Database error while loading admin dashboard", 500
+    except Exception as e:
+        print(f"Unexpected error in admin_dashboard: {e}")
+        return "Unexpected error while loading dashboard", 500
+    finally:
+        if cursor: # Check if cursor exists before closing
+            cursor.close()
+        if conn:
+            conn.close()
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return redirect('/login')
+
+
+@app.route('/admin/delete_customer', methods=['POST'])
+def delete_customer():
+    """
+    Deletes a customer and all their associated records across all related tables
+    in a transactional manner.
+    """
+    if 'admin' not in session:
+        return redirect('/login')
+
+    cust_no = request.form.get('cust_no')
+    
+    if not cust_no:
+        return "Customer ID is missing", 400
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return "Database connection failed", 500
+        
+        cursor = conn.cursor()
+        conn.start_transaction() # Start a transaction for atomicity
+
+        # --- 1. Retrieve IDs of related records before deletion ---
+        occ_id = None
+        fin_code = None
+        emp_id = None
+        gov_int_ids = [] # A customer can be related to multiple public officials
+        
+        # Get occ_id and fin_code from the customer table
+        cursor.execute("SELECT occ_id, fin_code FROM customer WHERE cust_no = %s", (cust_no,))
+        customer_info = cursor.fetchone()
+        if customer_info:
+            occ_id, fin_code = customer_info
+        
+        # Get emp_id from employment_details (if exists)
+        cursor.execute("SELECT emp_id FROM employment_details WHERE cust_no = %s", (cust_no,))
+        emp_info = cursor.fetchone()
+        if emp_info:
+            emp_id = emp_info[0]
+
+        # Get gov_int_ids from cust_po_relationship (can be multiple)
+        cursor.execute("SELECT gov_int_id FROM cust_po_relationship WHERE cust_no = %s", (cust_no,))
+        gov_int_results = cursor.fetchall()
+        gov_int_ids = [row[0] for row in gov_int_results]
+
+        # --- 2. Delete from child tables directly referencing cust_no ---
+        # The order here is important if you don't have ON DELETE CASCADE set up for all FKs.
+        # It's safer to delete records in tables that depend on `cust_no` first.
+        cursor.execute("DELETE FROM credentials WHERE cust_no = %s", (cust_no,)) 
+        cursor.execute("DELETE FROM employment_details WHERE cust_no = %s", (cust_no,))
+        cursor.execute("DELETE FROM spouse WHERE cust_no = %s", (cust_no,))
+        cursor.execute("DELETE FROM company_affiliation WHERE cust_no = %s", (cust_no,))
+        cursor.execute("DELETE FROM existing_bank WHERE cust_no = %s", (cust_no,))
+        cursor.execute("DELETE FROM cust_po_relationship WHERE cust_no = %s", (cust_no,))
+
+        # --- 3. Delete from indirectly linked tables (employer_details, public_official_details) ---
+        # These deletions depend on IDs retrieved from intermediate tables (employment_details, cust_po_relationship).
+        if emp_id:
+            cursor.execute("DELETE FROM employer_details WHERE emp_id = %s", (emp_id,))
+        
+        if gov_int_ids:
+            for gov_id in gov_int_ids:
+                cursor.execute("DELETE FROM public_official_details WHERE gov_int_id = %s", (gov_id,))
+        
+        # --- 4. Delete the main customer record ---
+        cursor.execute("DELETE FROM customer WHERE cust_no = %s", (cust_no,))
+
+        # --- 5. Delete from parent tables whose records are now orphaned (occupation, financial_record) ---
+        # These are deleted last because the customer record referenced them.
+        if occ_id:
+            cursor.execute("DELETE FROM occupation WHERE occ_id = %s", (occ_id,))
+        if fin_code:
+            cursor.execute("DELETE FROM financial_record WHERE fin_code = %s", (fin_code,))
+
+        conn.commit() # Commit the transaction if all deletions are successful
+
+        return redirect('/admin_dashboard')
+
+    except mysql.connector.Error as err:
+        if conn:
+            conn.rollback() # Rollback on database error
+        print(f"DB delete error: {err}")
+        return "Failed to delete customer and related data. Error: " + str(err), 500
+    except Exception as e:
+        if conn:
+            conn.rollback() # Rollback on unexpected error
+        print(f"Unexpected delete error: {e}")
+        return "An unexpected error occurred during deletion: " + str(e), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+# --- Main execution block ---
+if __name__ == '__main__':
+    # Run schema updates/migrations on app startup.
+    # In a production environment, this should be handled by dedicated migration tools.
+    _ensure_database_schema()
+
+    # Use 0.0.0.0 to make the Flask app accessible from any IP address
+    # This is important for environments where Flask is run inside a container (e.g., Docker)
+    app.run(host='0.0.0.0', port=0000, debug=True) # Corrected port to 5000
+
+
+
+main.js
+
+// Utility Functions
+const utils = {
+    validateForm: (formData) => {
+        const errors = {};
+        for (const [key, value] of formData.entries()) {
+            if (!value.trim()) {
+                errors[key] = `${key.charAt(0).toUpperCase() + key.slice(1)} is required`;
+            }
+        }
+        return errors;
+    },
+
+    showNotification: (message, type = 'success') => {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    },
+
+    formatDate: (date) => {
+        return new Date(date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    },
+
+    debounce: (func, wait) => {
+        let timeout;
+        return function executedFunction(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func(...args), wait);
+        };
+    }
+};
+
+// API Service (includes delete and future endpoints)
+const api = {
+    baseUrl: '', // root
+
+    async fetch(endpoint, options = {}) {
+        try {
+            const response = await fetch(`${this.baseUrl}${endpoint}`, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('API Error:', error);
+            throw error;
+        }
+    },
+
+    customers: {
+        delete: async (cust_no) => {
+            return await fetch(`/delete_customer/${cust_no}`, {
+                method: 'DELETE'
+            });
+        }
+    }
+};
+
+// UI Components
+const components = {
+    createSpinner: () => {
+        const spinner = document.createElement('div');
+        spinner.className = 'spinner';
+        spinner.innerHTML = `
+            <div class="spinner-inner">
+                <div class="spinner-circle"></div>
+            </div>
+        `;
+        return spinner;
+    },
+
+    createModal: (title, content) => {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>${title}</h2>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">${content}</div>
+            </div>
+        `;
+        return modal;
+    },
+
+    createForm: (fields, onSubmit) => {
+        const form = document.createElement('form');
+        form.className = 'dynamic-form';
+
+        fields.forEach(field => {
+            const div = document.createElement('div');
+            div.className = 'form-group';
+
+            const label = document.createElement('label');
+            label.textContent = field.label;
+            label.htmlFor = field.id;
+
+            const input = document.createElement('input');
+            input.type = field.type || 'text';
+            input.id = field.id;
+            input.name = field.id;
+            input.required = field.required || false;
+
+            if (field.placeholder) {
+                input.placeholder = field.placeholder;
+            }
+
+            div.appendChild(label);
+            div.appendChild(input);
+            form.appendChild(div);
+        });
+
+        const submitButton = document.createElement('button');
+        submitButton.type = 'submit';
+        submitButton.textContent = 'Submit';
+        form.appendChild(submitButton);
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            await onSubmit(data);
+        });
+
+        return form;
+    }
+};
+
+// DOM Ready
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof theme !== 'undefined' && theme.init) {
+        theme.init(); // Initialize theming if available
+    }
+});
+
+// Expose globally
+window.app = {
+    utils,
+    api,
+    components,
+};
+
+
+
+registration.js
+
+// --- registration.js (fully updated with validation, debug, and navigation) ---
+
+function saveFormData(formId) {
+    const form = document.getElementById(formId);
+    const formData = new FormData(form);
+    const data = {};
+
+    for (let [key, value] of formData.entries()) {
+        // Only include non-empty values for registration3-form to avoid sending empty fields
+        // if (formId === 'registration3-form' && !value) continue; // Removed this for now, backend expects all fields
+
+        // Handle multiple selections for array fields (e.g., checkboxes, multi-selects)
+        if (key.endsWith('[]')) {
+            const baseKey = key.slice(0, -2);
+            if (!data[baseKey]) data[baseKey] = [];
+            data[baseKey].push(value);
+        } else {
+            // Check for radio buttons, only save the checked one
+            const element = form.elements[key];
+            if (element && element.type === 'radio') {
+                if (element.checked) {
+                    data[key] = value;
+                }
+            } else if (element && element.type === 'checkbox') {
+                 // For single checkboxes, if not checked, FormData doesn't include it.
+                 // So we explicitly set it to false if it's a checkbox and not in data.
+                 if (!data.hasOwnProperty(key)) { // Only if not already added by formData.entries for checked state
+                     data[key] = false; // Default to false if unchecked
+                 }
+                 data[key] = value; // This will overwrite if it was checked
+            } else {
+                data[key] = value;
+            }
+        }
+    }
+    sessionStorage.setItem(formId, JSON.stringify(data));
+    console.log(`Saved ${formId}:`, data); // DEBUG LOG
+}
+
+function loadFormData(formId) {
+    const savedData = sessionStorage.getItem(formId);
+    if (savedData) {
+        const data = JSON.parse(savedData);
+        const form = document.getElementById(formId);
+
+        for (let key in data) {
+            const elements = form.elements[key];
+            if (!elements) continue; // Skip if element not found
+
+            if (Array.isArray(data[key])) {
+                // Handle multiple elements with the same name (e.g., checkboxes, dynamic inputs)
+                data[key].forEach((value, index) => {
+                    if (elements[index]) {
+                        if (elements[index].type === 'checkbox') {
+                            elements[index].checked = true; // Check if value exists (simple check for now)
+                        } else {
+                            elements[index].value = value;
+                        }
+                    } else {
+                        // This might indicate dynamically added fields that don't exist yet on load
+                        console.warn(`Element with index ${index} for key ${key} not found on load.`);
+                    }
+                });
+            } else if (elements.length > 0 && (elements[0].type === 'radio' || elements[0].type === 'checkbox')) {
+                // Handle radio buttons and grouped checkboxes
+                for (let i = 0; i < elements.length; i++) {
+                    if (elements[i].value === data[key]) {
+                        elements[i].checked = true;
+                    }
+                }
+            } else if (elements.type === 'checkbox') {
+                elements.checked = data[key]; // For a single checkbox
+            } else {
+                elements.value = data[key];
+            }
+        }
+    }
+    console.log(`Loaded ${formId}:`, JSON.parse(sessionStorage.getItem(formId) || '{}')); // DEBUG LOG
+}
+
+function handleFormSubmit(event, nextPage) {
+    event.preventDefault(); // Prevent default form submission
+    const form = event.target;
+
+    console.log("Form submission triggered:", form.id); // DEBUG LOG
+
+    // Save data for the current form step
+    saveFormData(form.id);
+
+    // Specific logic for the final submission from registrationPrint
+    if (form.id === 'registrationPrint-form') {
+        console.log("Handling registrationPrint-form submission for final API call");
+
+        const r1 = JSON.parse(sessionStorage.getItem('registration1-form') || '{}');
+        const r2 = JSON.parse(sessionStorage.getItem('registration2-form') || '{}');
+        const r3 = JSON.parse(sessionStorage.getItem('registration3-form') || '{}');
+
+        const errors = [];
+
+        // Basic validation for required fields
+        if (!r1.firstName || !r1.lastName || !r1.dob || !r1.nationality || !r1.address || !r1.email) {
+            errors.push("Personal Information (Step 1) is incomplete. Please ensure all required fields are filled.");
+        }
+
+        if (!r2.occupation || !r2.natureOfBusiness || !r2.monthlyIncome || !r2.annualIncome) {
+            errors.push("Employment and Financial Information (Step 2) is incomplete. Please ensure all required fields are filled.");
+        }
+
+        // Check if at least one bank account is added
+        // Note: r3.bank might be a single string if only one item, or an array if multiple
+        const bankAccountsAdded = (r3.bank && (Array.isArray(r3.bank) ? r3.bank.some(b => b.trim() !== '') : r3.bank.trim() !== ''));
+        if (!bankAccountsAdded) {
+            errors.push("Additional Information (Step 3): Please add at least one bank account.");
+        }
+        
+        if (errors.length > 0) {
+            alert(errors.join('\n\n'));
+            return;
+        }
+
+        // Terms and conditions check
+        const termsCheck = document.getElementById('termsCheck');
+        if (termsCheck && !termsCheck.checked) {
+            alert('Please accept the terms and conditions to proceed.');
+            return;
+        }
+
+        // Consolidate all data for sending
+        const data = {
+            registration1: r1,
+            registration2: r2,
+            registration3: r3
+        };
+
+        console.log("Sending data to backend:", data); // DEBUG LOG
+
+        // Send data to Flask backend
+        fetch('/submitRegistration', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (response.ok) {
+                console.log("Submission successful");
+                sessionStorage.clear(); // Clear all saved data on successful submission
+                window.location.href = 'registrationSuccess';
+            } else {
+                // If response is not OK, try to read error message from backend
+                response.text().then(errorMessage => {
+                    alert(`Submission failed: ${errorMessage || response.statusText}. Please try again.`);
+                    console.error("Submission error response:", response.status, errorMessage);
+                }).catch(() => {
+                    alert(`Submission failed with status: ${response.status}. Please try again.`);
+                    console.error("Submission error: Could not parse error message.");
+                });
+            }
+        })
+        .catch(err => {
+            console.error("Submission network error:", err);
+            alert("Submission failed due to network or server error. Please check your connection and try again.");
+        });
+
+        return; // Exit function after handling final submission
+    }
+
+    // For intermediate steps, just navigate to the next page
+    window.location.href = nextPage;
+}
+
+function handleBack() {
+    const currentPage = window.location.pathname.split('/').pop();
+    const backPages = {
+        'registration2.html': 'registration1', // Specific HTML files for clarity
+        'registration3.html': 'registration2',
+        'registrationPrint.html': 'registration3'
+    };
+
+    // If currentPage is just "registration2" etc., add .html for lookup
+    const lookupPage = currentPage.endsWith('.html') ? currentPage : currentPage + '.html';
+
+    if (backPages[lookupPage]) {
+        window.location.href = backPages[lookupPage];
+    } else if (currentPage === 'registration1.html' || currentPage === 'register.html') {
+        // If on the first registration step, go back to the landing page
+        window.location.href = '/';
+    }
+}
+
+function handleCancel() {
+    // Replaced alert with custom modal logic if needed, but for now, using confirm for simplicity as per user's original code
+    if (confirm('Are you sure you want to cancel? All entered data will be lost.')) {
+        sessionStorage.clear(); // Clear all stored data
+        window.location.href = '/'; // Redirect to landing page
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const forms = {
+        'registration1-form': 'registration2',
+        'registration2-form': 'registration3',
+        'registration3-form': 'registrationPrint',
+        'registrationPrint-form': 'registrationSuccess' // This won't be directly navigated, but used for logic
+    };
+
+    for (let formId in forms) {
+        const form = document.getElementById(formId);
+        if (form) {
+            console.log(`Initializing form event listeners for: ${formId}`);
+
+            // Load data when the form page loads
+            loadFormData(formId);
+
+            // Add submit listener for the form
+            form.addEventListener('submit', function(event) {
+                handleFormSubmit(event, forms[formId]);
+            });
+
+            // Add event listeners for back and cancel buttons if they exist
+            const cancelBtn = form.querySelector('.cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', handleCancel);
+            }
+
+            const backBtn = form.querySelector('.back-btn');
+            if (backBtn) {
+                backBtn.addEventListener('click', handleBack);
+            }
+        }
+    }
+});
+
+
+
+db_config.py
+db_config = {
+    'host': '127.0.0.1',
+    'port': '3306',
+    'user': 'root',
+    'password': 'LandBank@2025',       # update this
+    'database': 'database_landbank'
+}
+
+
+
+regitration1.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LBMS Portal - Registration</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='registration.css') }}">
+</head>
+<body>
+    <div class="background-overlay"></div>
+
+    <div class="container">
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-step active">
+                <div class="step-number">1</div>
+                <div class="step-label">Personal Info</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">2</div>
+                <div class="step-label">Employment</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">3</div>
+                <div class="step-label">Additional</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">4</div>
+                <div class="step-label">Review</div>
+            </div>
+        </div>
+
+        <!-- FORM START -->
+        <form id="registration1-form" class="profile-form" method="POST">
+
+            <h2>
+                <span class="icon"><img src="{{ url_for('static', filename='assets/personal_icon.png') }}" alt="Profile Icon" style="width: 1.3em; vertical-align: middle;"></span>
+                CUSTOMER INFORMATION SHEET FOR INDIVIDUAL CUSTOMER
+            </h2>
+
+            <hr style="border: 0; border-top: 1.5px solid #545454; margin: 10px 0 20px 0;">
+
+            <!-- PERSONAL INFORMATION -->
+            <section class="section-name">
+                <h3>
+                    <span class="icon"><img src="{{ url_for('static', filename='assets/info_icon.png') }}" alt="Personal Icon" style="width: 2em; vertical-align: middle;"></span>
+                    <span style="color:#b90404;">*</span> PERSONAL INFORMATION
+                </h3>
+
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="lastName" name="lastName" required>
+                        <label for="lastName">Last Name</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="firstName" name="firstName" required>
+                        <label for="firstName">First Name</label>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="date" id="dob" name="dob" required>
+                        <label for="dob">Date of Birth</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="nationality" name="nationality" required>
+                        <label for="nationality">Nationality</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="citizenship" name="citizenship" required>
+                        <label for="citizenship">Citizenship</label>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="floating-label-group">
+                        <select id="sex" name="sex" required>
+                            <option value="" disabled selected hidden>▼</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                        <label for="sex">Sex</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <select id="civilStatus" name="civilStatus" required>
+                            <option value="" disabled selected hidden>▼</option>
+                            <option value="Single">Single</option>
+                            <option value="Married">Married</option>
+                            <option value="Widowed">Widowed</option>
+                            <option value="Separated">Separated</option>
+                        </select>
+                        <label for="civilStatus">Civil Status</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="number" id="children" name="children" min="0" required>
+                        <label for="children">No. of Children</label>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="placeOfBirth" name="placeOfBirth" required>
+                        <label for="placeOfBirth">Place of Birth</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="address" name="address" required>
+                        <label for="address">Current Address</label>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="motherMaidenName" name="motherMaidenName" required>
+                        <label for="motherMaidenName">Mother's Maiden Name</label>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- CONTACT INFORMATION -->
+            <section class="section-contact">
+                <h3>
+                    <span class="icon"><img src="{{ url_for('static', filename='assets/contact_icon.png') }}" alt="Contact Icon" style="width: 2em; vertical-align: middle;"></span>
+                    <span style="color:#b90404;">*</span> CONTACT INFORMATION
+                </h3> 
+
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="email" id="email" name="email" required>
+                        <label for="email">Email</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="tel" id="telephone" name="telephone" required>
+                        <label for="telephone">Phone Number</label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SPOUSE INFORMATION -->
+            <section class="section-spouse">
+                <h3>
+                    <span class="icon"><img src="{{ url_for('static', filename='assets/info_icon.png') }}" alt="Personal Icon" style="width: 2em; vertical-align: middle;"></span>
+                    SPOUSE
+                </h3>
+
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="spouseLastName" name="spouseLastName">
+                        <label for="spouseLastName">Last Name</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="spouseFirstName" name="spouseFirstName">
+                        <label for="spouseFirstName">First Name</label>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="date" id="spouseDob" name="spouseDob">
+                        <label for="spouseDob">Date of Birth</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="spouseProfession" name="spouseProfession">
+                        <label for="spouseProfession">Profession</label>
+                    </div>
+                </div>
+            </section>
+
+            <div class="form-actions">
+                <button type="button" class="cancel-btn">⟲ CANCEL</button>
+                <button type="submit" class="next-btn">NEXT</button>
+            </div>
+        </form>
+        <!-- FORM END -->
+    </div>
+
+    <script src="{{ url_for('static', filename='js/registration.js') }}"></script>
+</body>
+</html>
+
+
+regitration2.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LBMS Portal - Registration (Step 2)</title>
+    <link rel="stylesheet" href="static/registration.css">
+</head>
+<body>
+    <div class="background-overlay">
+    </div>
+    <div class="container">
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-step completed">
+                <div class="step-number">1</div>
+                <div class="step-label">Personal Info</div>
+            </div>
+            <div class="progress-step active">
+                <div class="step-number">2</div>
+                <div class="step-label">Employment</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">3</div>
+                <div class="step-label">Additional</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">4</div>
+                <div class="step-label">Review</div>
+            </div>
+        </div>
+        <form id="registration2-form" class="profile-form">
+            <h2><span class="icon"><img src="static/assets/personal_icon.png" alt="Profile Icon" style="width: 1.3em; vertical-align: middle;"></span> CUSTOMER INFORMATION SHEET FOR INDIVIDUAL CUSTOMER</h2>
+            <hr style="border: 0; border-top: 1.5px solid #545454; margin: 10px 0 20px 0;">
+            <section class="section-employment">
+                <h3><span class="icon"><img src="static/assets/employment-icon.png" alt="Employment Icon" style="width: 2em; vertical-align: middle;"></span><span style="color:#b90404;">*</span>Employment Information</h3>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <select name="occupation" id="occupation" required>
+                            <option value="" disabled selected hidden>▼</option>
+                            <option value="Employed">Employed</option>
+                            <option value="Self-employed">Self-employed</option>
+                            <option value="OFW/Overseas Filipino">OFW/Overseas Filipino</option>
+                            <option value="Retired">Retired</option>
+                            <option value="Farmer/Fisher">Farmer/Fisher</option>
+                            <option value="Student/Minor">Student/Minor</option>
+                            <option value="Unemployed">Unemployed</option>
+                            <option value="Housewife">Housewife</option>
+                            <option value="Lawyers/Notary/Independent Legal Professional/Accountant">Lawyers/Notary/Independent Legal Professional/Accountant</option>
+                            <option value="Government Official">Government Official</option>
+                        </select>
+                        <label for="occupation">Occupation</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <select name="natureOfBusiness" id="natureOfBusiness" required>
+                            <option value="" disabled selected hidden>▼</option>
+                            <option value="1700">1700 - Private Household with Employed Persons</option>
+                            <option value="1800">1800 - Extra-territorial Organizations and Bodies</option>
+                            <option value="1204">1204 - Jewelry and Precious Stones Dealer</option>
+                            <option value="1005">1005 - Foreign Exchange Dealer Money Changer/ Remittance Agent</option>
+                            <option value="A0103">A0103 - Agriculture, Forestry, and Fishing</option>
+                            <option value="B0609">B0609 - Mining and Quarrying</option>
+                            <option value="C1033">C1033 - Manufacturing</option>
+                            <option value="D3500">D3500 - Electricity, Gas, Steam, and Air-conditioning Supply</option>
+                            <option value="E3639">E3639 - Water Supply, Sewerage, Waste Management and Remediation Activities </option>
+                            <option value="F4143">F4143 - Construction </option>
+                            <option value="G4547">G4547 - Wholesale and Retail Trade, Repair of Motor Vehicles and Motorcycles</option>
+                            <option value="H4953">H4953 - Transportation and Storage</option>
+                            <option value="I5556">I5556 - Accommodation and Food Service Activities</option>
+                            <option value="J5863">J5863 - Information and Communication</option>
+                            <option value="K6466">K6466 - Financial and Insurance Activities</option>
+                            <option value="L800">L800 - Real Estate Activities</option>
+                            <option value="M6975">M6975 - Professional, Scientific, and Technical Activities</option>
+                            <option value="N7782">N7782 - Administrative and Support Service Activities</option>
+                            <option value="O6400">O6400 - Public Administrative and Defense, Compulsory Social Security</option>
+                            <option value="P8500">P8500 - Education</option>
+                            <option value="Q8688">Q8688 - Human Health and Social Work Activities</option>
+                            <option value="R9093">R9093 - Arts, Entertainment, and Recreation</option>
+                            <option value="S9496">S9496 - Other Service Activities (Activities of Membership Organizations)</option>
+                            <option value="T9798">T9798 - Activities of Private Households as Employers and Undifferentiated Goods and Service and Producing Activities of Households for own use</option>
+                            <option value="U9900">U9900 - Activities of Extraterritorial Organizations, and Bodies </option>
+                            <option value="V0000">V0000 - Others</option>
+                            <option value="V0001">V0001 - Others - Student/Minor/Retiree/Pensioner</option>
+                            <option value="V0002">V0002 - Others - Unemployed/Housewife</option>
+                            <option value="9200">9200 - Gambling and Betting Activities</option>
+                            <option value="9210">9210 - OGOs and OGO Service Providers</option>
+                            <option value="9220">9220 - Casinos</option>
+                        </select>
+                        <label for="natureOfBusiness">Nature of Business/Economic Activity</label>
+                    </div>
+                </div>
+            </section>
+            <section class="section-employer">
+                <hr style="border: 0; border-top: 1.5px solid #545454; margin: 25px 0 25px 0;">
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="tinId" name="tinId">
+                        <label for="tinId">TIN ID</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="companyName" name="companyName">
+                        <label for="companyNameame">Company Name</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="employerAddress" name="employerAddress">
+                        <label for="employerAddress">Current Address (No./Street, Subd.,Brgy./District/Municipality/City/Province)</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="text" id="employerPhone" name="employerPhone">
+                        <label for="employerPhone">Phone/Fax Number</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="floating-label-group">
+                        <input type="text" id="jobTitle" name="jobTitle">
+                        <label for="jobTitle">Job Title</label>
+                    </div>
+                    <div class="floating-label-group">
+                        <input type="date" id="employmentDate" name="employmentDate">
+                        <label for="employmentDate">Employment Date</label>
+                    </div>
+                </div>
+            </section>
+            <hr style="border: 0; border-top: 1.5px solid #545454; margin: 25px 0 25px 0;">
+            <section class="section-financial">
+                <h3><span class="icon"><img src="static/assets/finance-icon.png" alt="Financial Icon" style="width: 2em; vertical-align: middle;"></span><span style="color:#b90404;">*</span>Financial Record</h3>
+                <div class="row">
+                    <div class="form-group" style="flex:2;">
+                        <label style="font-family: Inter; font-size: 1rem; color: #184d3a; font-weight: 500; margin-bottom: 10px;">Source of Wealth <span style="font-size:0.9em; color:#737373;">(1-Primary, 2-Secondary, 3-Other Source)</span></label>
+                        <br>
+                        <br>
+                        <div class="checkbox-group" style="display: flex; font-family: Inter; font-size: 0.9em; flex-wrap: wrap; gap: 15px;">
+                            <label><input type="checkbox" name="sourceOfWealth" value="Salary/Honoraria"> Salary/Honoraria</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Interest/Commission"> Interest/Commission</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Business"> Business</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Pension"> Pension</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Regular Remittance"> Regular Remittance</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Other Remittance"> Other Remittance</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Donations/Inheritance"> Donations/Inheritance</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Allowance"> Allowance</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Professional Fees - Others"> Professional Fees - Others</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Professional Fees - Lawyers/Notary/Independent"> Professional Fees - Lawyers/Notary/Independent</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Grant/Scholarship/Awards/Prizes/Benefits"> Grant/Scholarship/Awards/Prizes/Benefits</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Royalties/Commission"> Royalties/Commission</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Sale of Assets"> Sale of Assets</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Loans"> Loans</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Government Appropriations"> Government Appropriations</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Fees and Charges"> Fees and Charges</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Taxes and Licenses"> Taxes and Licenses</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Others - with documents"> Others - with documents</label>
+                            <label><input type="checkbox" name="sourceOfWealth" value="Others - without documents"> Others - without documents</label>
+                        </div>
+                    </div>
+                    <div class="row" style="gap: 10px; justify-content: flex-start;">
+                        <div class="floating-label-group" style="width: 300px;">
+                            <select name="monthlyIncome" id="monthlyIncome" required>
+                                <option value="" disabled selected hidden>▼</option>
+                                <option value="30000_and_below">Php 30,000.00 and below</option>
+                                <option value="30000_01_to_50000">Php 30,000.01-50,000.00</option>
+                                <option value="50000_01_to_100000">Php 50,000.01-100,000.00</option>
+                                <option value="100000_01_to_500000">Php 100,000.01-500,000.00</option>
+                                <option value="over_500000">Over Php 500,000.00</option>
+                            </select>
+                            <label for="monthlyIncome">Monthly Gross Income/Pension/Allowance</label>
+                        </div>
+                        <div class="floating-label-group" style="width: 300px;">
+                            <select name="annualIncome" id="annualIncome" required>
+                                <option value="" disabled selected hidden>▼</option>
+                                <option value="360000_and_below">Php 360,000.00 and below</option>
+                                <option value="360000_01_to_600000">Php 360,000.01-600,000.00</option>
+                                <option value="600000_01_to_1200000">Php 600,000.01-1,200,000.00</option>
+                                <option value="1200000_01_to_6000000">Php 1,200,000.01-6,000,000.00</option>
+                                <option value="over_6000000">Over Php 6,000,000.00</option>
+                            </select>
+                            <label for="annualIncome">Annual Gross Income/Pension/Allowance</label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <div class="form-actions">
+                <div class="left-buttons">
+                    <button type="button" class="cancel-btn">⟲ CANCEL</button>
+                </div>
+                <div class="right-buttons">
+                    <button type="button" class="back-btn">← BACK</button>
+                    <button type="submit" class="next-btn">NEXT</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <script src="static/js/registration.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const checkboxes = document.querySelectorAll('input[name="sourceOfWealth"]');
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', function() {
+                const checked = document.querySelectorAll('input[name="sourceOfWealth"]:checked');
+                if (checked.length > 3) {
+                    this.checked = false;
+                    alert('You can select up to three sources of wealth only.');
+                }
+            });
+        });
+    });
+    </script>
+</body>
+</html> 
+
+
+registration3.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LBMS Portal - Registration (Step 3)</title>
+    <link rel="stylesheet" href="static/registration.css">
+</head>
+<body>
+    <div class="background-overlay"></div>
+    <div class="container">
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-step completed">
+                <div class="step-number">1</div>
+                <div class="step-label">Personal Info</div>
+            </div>
+            <div class="progress-step completed">
+                <div class="step-number">2</div>
+                <div class="step-label">Employment</div>
+            </div>
+            <div class="progress-step active">
+                <div class="step-number">3</div>
+                <div class="step-label">Additional</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">4</div>
+                <div class="step-label">Review</div>
+            </div>
+        </div>
+        <form id="registration3-form" class="profile-form">
+            <h2><span class="icon"><img src="static/assets/personal_icon.png" alt="Profile Icon" style="width: 1.3em; vertical-align: middle;"></span> CUSTOMER INFORMATION SHEET FOR INDIVIDUAL CUSTOMER</h2>
+            <hr style="border: 0; border-top: 1.5px solid #545454; margin: 10px 0 20px 0;">
+            <section>
+                <h3 style="margin-top:0.5em;">ADDITIONAL INFORMATION</h3>
+                <div id="depositor-entries">
+                    <div class="row depositor-entry">
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="depositorRole[]">
+                            <label>Depositor Role</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="companyName[]">
+                            <label>Company Name</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="add-btn" onclick="addDepositorEntry()">+ Add Depositor</button>
+            </section>
+            <section>
+                <h3>EXISTING BANK ACCOUNT</h3>
+                <div id="bank-entries">
+                    <div class="row bank-entry">
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="bank[]">
+                            <label>Bank</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="branch[]">
+                            <label>Branch</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="accountType[]">
+                            <label>Account Type</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="add-btn" onclick="addBankEntry()">+ Add Bank Account</button>
+            </section>
+            <section>
+                <h3>RELATIONSHIP TO OFFICIAL OF GOVERNMENT/INTERNATIONAL ORGANIZATION</h3>
+                <div id="relationship-entries">
+                    <div class="row relationship-entry">
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="govLastName[]">
+                            <label>Last Name</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="govFirstName[]">
+                            <label>First Name</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="govMiddleName[]">
+                            <label>Middle Name</label>
+                        </div>
+                    </div>
+                    <div class="row relationship-entry">
+                        <div class="floating-label-group">
+                            <select name="relationship[]">
+                                <option value="" disabled selected hidden>▼</option>
+                                <option value="Father">Father</option>
+                                <option value="Mother">Mother</option>
+                                <option value="Mother-in- Law">Mother-in-Law</option>
+                                <option value="Father-in-Law">Father-in-Law</option>
+                                <option value="Son">Son</option>
+                                <option value="Daughter">Daughter</option>
+                                <option value="Son-in-Law">Son-in-Law</option>
+                                <option value="Daughter-in-Law">Daughter-in-Law</option>
+                                <option value="Brother">Brother</option>
+                                <option value="Sister">Sister</option>
+                                <option value="Sibling">Sibling</option>
+                                <option value="Brother-in-Law">Brother-in-Law</option>
+                                <option value="Sister-in-Law">Sister-in-Law</option>
+                                <option value="Grandfather">Grandfather</option>
+                                <option value="Grandmother">Grandmother</option>
+                                <option value="Granddaughter">Granddaughter</option>
+                                <option value="Grandson">Grandson</option>
+                                <option value="Uncle">Uncle</option>
+                                <option value="Aunt">Aunt</option>
+                                <option value="Nephew">Nephew</option>
+                                <option value="Niece">Niece</option>
+                                <option value="Cousin">Cousin</option>
+                                <option value="Spouse">Spouse</option>
+                            </select>
+                            <label>Relationship</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="position[]">
+                            <label>Position</label>
+                        </div>
+                        <div class="floating-label-group">
+                            <input type="text" placeholder=" " name="govBranchOrgName[]">
+                            <label>Government Branch/Organization Name</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="add-btn" onclick="addRelationshipEntry()">+ Add Relationship</button>
+            </section>
+            <div class="form-actions">
+                <div class="left-buttons">
+                    <button type="button" class="cancel-btn">⟲ CANCEL</button>
+                </div>
+                <div class="right-buttons">
+                    <button type="button" class="back-btn">← BACK</button>
+                    <button type="submit" class="next-btn">NEXT</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <script src="static/js/registration.js"></script>
+    <script>
+    // Dynamic Depositor Role/Company Name
+    function addDepositorEntry() {
+        const container = document.getElementById('depositor-entries');
+        const entries = container.querySelectorAll('.depositor-entry');
+        if (entries.length >= 3) return;
+        const clone = entries[0].cloneNode(true);
+        clone.querySelectorAll('input').forEach(input => input.value = '');
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.className = 'remove-btn';
+        removeBtn.onclick = function() { clone.remove(); };
+        clone.appendChild(removeBtn);
+        container.appendChild(clone);
+    }
+    // Dynamic Bank Account
+    function addBankEntry() {
+        const container = document.getElementById('bank-entries');
+        const entries = container.querySelectorAll('.bank-entry');
+        if (entries.length >= 3) return;
+        const clone = entries[0].cloneNode(true);
+        clone.querySelectorAll('input').forEach(input => input.value = '');
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.className = 'remove-btn';
+        removeBtn.onclick = function() { clone.remove(); };
+        clone.appendChild(removeBtn);
+        container.appendChild(clone);
+    }
+    // Dynamic Relationship
+    function addRelationshipEntry() {
+        const container = document.getElementById('relationship-entries');
+        const entries = container.querySelectorAll('.relationship-entry');
+        if (entries.length >= 6) return; // 2 rows per entry
+        // Clone both rows (name row and details row)
+        const nameRow = entries[0].cloneNode(true);
+        nameRow.querySelectorAll('input').forEach(input => input.value = '');
+        const detailsRow = entries[1].cloneNode(true);
+        detailsRow.querySelectorAll('input,select').forEach(input => input.value = '');
+        // Remove button
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.className = 'remove-btn';
+        removeBtn.onclick = function() { nameRow.remove(); detailsRow.remove(); };
+        detailsRow.appendChild(removeBtn);
+        container.appendChild(nameRow);
+        container.appendChild(detailsRow);
+    }
+    </script>
+</body>
+</html>
+
+
+
+registrationPrint.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LBMS Portal - Registration Summary</title>
+  <link rel="stylesheet" href="static/registration.css" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
+</head>
+<body>
+  <div class="background-overlay"></div>
+  <div class="container">
+    <!-- Progress Bar -->
+    <div class="progress-container">
+      <div class="progress-step completed"><div class="step-number">1</div><div class="step-label">Personal Info</div></div>
+      <div class="progress-step completed"><div class="step-number">2</div><div class="step-label">Employment</div></div>
+      <div class="progress-step completed"><div class="step-number">3</div><div class="step-label">Additional Info</div></div>
+      <div class="progress-step active"><div class="step-number">4</div><div class="step-label">Review</div></div>
+    </div>
+
+    <form id="registrationPrint-form" class="profile-form">
+      <h2>
+        <span class="icon"><img src="static/assets/personal_icon.png" alt="Profile Icon" style="width: 1.3em; vertical-align: middle;"></span>
+        REGISTRATION SUMMARY
+      </h2>
+      <hr style="border: 0; border-top: 1.5px solid #545454; margin: 10px 0 20px 0;" />
+
+      <!-- Personal Information Summary -->
+      <section class="summary-section">
+        <h3><i class="fas fa-user"></i> Personal Information</h3>
+        <div class="summary-grid">
+          <div class="summary-item"><label>Full Name:</label><span id="fullName"></span></div>
+          <div class="summary-item"><label>Date of Birth:</label><span id="dob"></span></div>
+          <div class="summary-item"><label>Nationality:</label><span id="nationality"></span></div>
+          <div class="summary-item"><label>Civil Status:</label><span id="civilStatus"></span></div>
+          <div class="summary-item"><label>Address:</label><span id="address"></span></div>
+        </div>
+      </section>
+
+      <!-- Employment Information Summary -->
+      <section class="summary-section">
+        <h3><i class="fas fa-briefcase"></i> Employment Information</h3>
+        <div class="summary-grid">
+          <div class="summary-item"><label>Occupation:</label><span id="occupation"></span></div>
+          <div class="summary-item"><label>Nature of Business:</label><span id="natureOfBusiness"></span></div>
+          <div class="summary-item"><label>Monthly Income:</label><span id="monthlyIncome"></span></div>
+          <div class="summary-item"><label>Annual Income:</label><span id="annualIncome"></span></div>
+        </div>
+      </section>
+
+      <!-- Additional Information Summary -->
+      <section class="summary-section">
+        <h3><i class="fas fa-info-circle"></i> Additional Information</h3>
+        <div class="summary-grid">
+          <div class="summary-item"><label>Bank Accounts:</label><span id="bankAccounts"></span></div>
+          <div class="summary-item"><label>Government Relations:</label><span id="govRelations"></span></div>
+        </div>
+      </section>
+
+      <!-- Terms and Conditions -->
+      <section class="terms-section">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="termsCheck" required />
+          <label class="form-check-label" for="termsCheck">
+            I confirm that all information provided is accurate and complete. I understand that any false or misleading information may result in the rejection of my application.
+          </label>
+        </div>
+      </section>
+
+      <div class="form-actions">
+        <button type="button" class="cancel-btn back-btn">
+          <i class="fas fa-arrow-left"></i> BACK
+        </button>
+        <button type="button" class="submit-btn"
+          onclick="document.getElementById('registrationPrint-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))">
+          <i class="fas fa-check"></i> SUBMIT
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- JS to Fill Summary -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const r1 = JSON.parse(sessionStorage.getItem('registration1-form') || '{}');
+      const r2 = JSON.parse(sessionStorage.getItem('registration2-form') || '{}');
+      const r3 = JSON.parse(sessionStorage.getItem('registration3-form') || '{}');
+
+      document.getElementById('fullName').textContent = `${r1.firstName || ''} ${r1.lastName || ''}`;
+      document.getElementById('dob').textContent = r1.dob || '';
+      document.getElementById('nationality').textContent = r1.nationality || '';
+      document.getElementById('civilStatus').textContent = r1.civilStatus || '';
+      document.getElementById('address').textContent = r1.address || '';
+
+      document.getElementById('occupation').textContent = r2.occupation || '';
+      document.getElementById('natureOfBusiness').textContent = r2.natureOfBusiness || '';
+      document.getElementById('monthlyIncome').textContent = r2.monthlyIncome || '';
+      document.getElementById('annualIncome').textContent = r2.annualIncome || '';
+
+      document.getElementById('bankAccounts').textContent = r3.bank ? `${r3.bank.length} account(s) listed` : 'None';
+      document.getElementById('govRelations').textContent = r3.relationship ? `${r3.relationship.length} relation(s) listed` : 'None';
+    });
+  </script>
+
+  <!-- Include JS -->
+  <script src="static/js/registration.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+registrationSuccess.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LBMS Portal - Registration Success</title>
+    <link rel="stylesheet" href="static/registration.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="background-overlay"></div>
+    <div class="container">
+        <div class="success-container">
+            <div class="success-header">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h1>Registration Successful!</h1>
+                <p class="reference-number">Reference Number: <span id="refNumber">LBMS-2024-0001</span></p>
+            </div>
+
+            <div class="success-content">
+                <section class="next-steps">
+                    <h2><i class="fas fa-list-check"></i> Next Steps</h2>
+                    <div class="steps-list">
+                        <div class="step-item">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h3>Account Verification</h3>
+                                <p>Our team will verify your information within 24-48 hours. You will receive an email confirmation once verified.</p>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h3>Initial Deposit</h3>
+                                <p>Visit any Landbank branch to make your initial deposit. Please bring valid government-issued IDs and your reference number.</p>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h3>Online Banking Setup</h3>
+                                <p>Once verified, you'll receive instructions to set up your online banking access.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="important-info">
+                    <h2><i class="fas fa-circle-info"></i> Important Information</h2>
+                    <div class="info-grid">
+                        <div class="info-card">
+                            <i class="fas fa-envelope"></i>
+                            <h3>Email Confirmation</h3>
+                            <p>A confirmation email has been sent to your registered email address.</p>
+                        </div>
+                        <div class="info-card">
+                            <i class="fas fa-clock"></i>
+                            <h3>Processing Time</h3>
+                            <p>Account verification typically takes 24-48 hours during business days.</p>
+                        </div>
+                        <div class="info-card">
+                            <i class="fas fa-phone"></i>
+                            <h3>Contact Support</h3>
+                            <p>For assistance, call our support hotline: (02) 8-405-7000</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="download-section">
+                    <h2><i class="fas fa-download"></i> Download Documents</h2>
+                    <div class="download-buttons">
+                        <button class="download-btn">
+                            <i class="fas fa-file-pdf"></i>
+                            Registration Summary
+                        </button>
+                        <button class="download-btn">
+                            <i class="fas fa-file-pdf"></i>
+                            Terms and Conditions
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <div class="action-buttons">
+                <button class="home-btn" onclick="window.location.href='/'">
+                    <i class="fas fa-home"></i>
+                    Return to Home
+                </button>
+                <button class="track-btn" onclick="window.location.href='trackApplication.html'">
+                    <i class="fas fa-search"></i>
+                    Track Application
+                </button>
+            </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 
+
+
+login.html
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login - Landbank CIMS</title>
+  <link rel="stylesheet" href="static/login.css">
+  <link rel="stylesheet" href="static/js/components.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <div class="login-box">
+      <!-- Logo -->
+      <div class="logo-container">
+        <img src="static/assets/landbank-logo.png" alt="Landbank Logo" class="logo">
+      </div>
+
+      <!-- Flash Message Display -->
+      {% if error %}
+      <div class="alert alert-danger" style="margin-bottom: 10px; color: red; font-weight: 500;">
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <!-- Login Form -->
+      <form id="loginForm" class="login-form" method="POST" action="/login">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" required>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required>
+        </div>
+
+        <div class="form-options">
+          <div class="remember-me">
+            <input type="checkbox" id="remember" name="remember">
+            <label for="remember">Remember me</label>
+          </div>
+          <a href="#" class="forgot-password">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="login-button">SIGN IN</button>
+      </form>
+
+      <!-- Footer -->
+      <div class="signup-link">
+        <p>Don't have an account? <a href="/register">Sign up</a></p>
+      </div>
+    </div>
+
+    <!-- Social Media Links -->
+    <div class="socials">
+      <a href="https://www.facebook.com/landbankofficial" target="_blank" rel="noopener noreferrer">
+        <img src="static/assets/facebook-logo.png" alt="Facebook" class="Facebook-logo">
+      </a>
+      <a href="https://x.com/LBP_Official?s=09" target="_blank" rel="noopener noreferrer">
+        <img src="static/assets/twitter-logo.png" alt="Twitter" class="twitter-logo">
+      </a>
+      <a href="https://www.linkedin.com/company/land-bank-of-the-philippines-official/?originalSubdomain=ph" target="_blank" rel="noopener noreferrer">
+        <img src="static/assets/linkedin-logo.png" alt="LinkedIn">
+      </a>
+      <a href="https://www.instagram.com/landbankofficial/?hl=en" target="_blank" rel="noopener noreferrer">
+        <img src="static/assets/instagram-logo.png" alt="Instagram">
+      </a>
+    </div>
+  </div>
+
+  <script src="js/main.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Password visibility toggle
+      const passwordInput = document.getElementById('password');
+      const togglePassword = document.createElement('button');
+      togglePassword.type = 'button';
+      togglePassword.className = 'password-toggle';
+      togglePassword.innerHTML = '<img src="static/assets/show.png" alt="Toggle password visibility" class="eye-icon">';
+      togglePassword.style.cssText = `
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      `;
+
+      passwordInput.parentElement.style.position = 'relative';
+      passwordInput.parentElement.appendChild(togglePassword);
+
+      togglePassword.addEventListener('click', () => {
+        const type = passwordInput.type === 'password' ? 'text' : 'password';
+        passwordInput.type = type;
+        const eyeIcon = togglePassword.querySelector('.eye-icon');
+        eyeIcon.src = type === 'password' ? 'static/assets/show.png' : 'static/assets/hide.png';
+      });
+    });
+  </script>
+</body>
+</html>
+
+userHome.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LBMS Portal - User Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Optional: Link to Google Fonts for 'Inter' if not already imported globally via CSS -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='registration.css') }}">
+    <style>
+        /* Custom styles for userHome.html */
+        body {
+            background-color: #f8f9fa;
+            /* Prioritize Inter, fall back to robust system fonts */
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        }
+        .profile-form {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-top: 50px;
+            margin-bottom: 50px;
+            max-width: 900px; /* Adjust as needed */
+            margin-left: auto;
+            margin-right: auto;
+            border: 1px solid #e0e0e0;
+        }
+        .profile-form h2 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .summary-section {
+            background-color: #f2f4f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid #dee2e6;
+        }
+        .summary-section h3 {
+            color: #34495e;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #545454;
+            padding-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        .summary-section h3 i {
+            margin-right: 10px;
+            color: #007bff; /* Bootstrap primary color */
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px 25px;
+        }
+        .summary-item label {
+            font-weight: 600;
+            color: #555;
+            display: block; /* Ensure label takes full width */
+            margin-bottom: 5px;
+        }
+        .summary-item span {
+            display: block; /* Ensure value takes full width below label */
+            padding: 5px 0;
+            color: #333;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            padding: 8px 12px;
+            word-wrap: break-word; /* Prevent long words from overflowing */
+        }
+        .form-actions {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .action-btn {
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            color: #fff;
+            border: none;
+        }
+        .update-btn {
+            background: linear-gradient(to right, #007bff, #0056b3);
+        }
+        .update-btn:hover {
+            background: linear-gradient(to right, #0056b3, #007bff);
+            transform: translateY(-2px);
+        }
+        .logout-btn {
+            background: linear-gradient(to right, #dc3545, #b02a37);
+        }
+        .logout-btn:hover {
+            background: linear-gradient(to right, #b02a37, #dc3545);
+            transform: translateY(-2px);
+        }
+        .list-group-item-custom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px dashed #ced4da;
+        }
+        .list-group-item-custom:last-child {
+            border-bottom: none;
+        }
+        .list-group-custom {
+            padding-left: 20px; /* Indent for nested lists */
+        }
+        .no-records {
+            color: #888;
+            font-style: italic;
+            text-align: center;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="background-overlay"></div>
+    <div class="container">
+        <div class="profile-form">
+            <h2>
+                <span class="icon"><i class="fas fa-user-circle"></i></span>
+                WELCOME, {{ user_data.customer.custname | default('User') }}!
+            </h2>
+            <hr style="border: 0; border-top: 1.5px solid #545454; margin: 10px 0 20px 0;" />
+
+            <!-- Personal Information Summary -->
+            <section class="summary-section">
+                <h3><i class="fas fa-id-card"></i> Personal Information</h3>
+                <div class="summary-grid">
+                    <div class="summary-item"><label>Customer ID:</label><span>{{ user_data.customer.cust_no | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Full Name:</label><span>{{ user_data.customer.custname | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Date of Birth:</label><span>{{ user_data.customer.datebirth | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Nationality:</label><span>{{ user_data.customer.nationality | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Citizenship:</label><span>{{ user_data.customer.citizenship | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Gender:</label><span>{{ user_data.customer.custsex | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Place of Birth:</label><span>{{ user_data.customer.placebirth | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Civil Status:</label><span>{{ user_data.customer.civilstatus | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Number of Children:</label><span>{{ user_data.customer.num_children | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Mother's Maiden Name:</label><span>{{ user_data.customer.mmaiden_name | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Address:</label><span>{{ user_data.customer.cust_address | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Email Address:</label><span>{{ user_data.customer.email_address | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Contact No.:</label><span>{{ user_data.customer.contact_no | default('N/A') }}</span></div>
+                </div>
+            </section>
+
+            <!-- Spouse Information Summary (conditionally displayed) -->
+            {% if user_data.spouse %}
+            <section class="summary-section">
+                <h3><i class="fas fa-heart"></i> Spouse Information</h3>
+                <div class="summary-grid">
+                    <div class="summary-item"><label>Spouse Name:</label><span>{{ user_data.spouse.sp_name | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Spouse DOB:</label><span>{{ user_data.spouse.sp_datebirth | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Spouse Profession:</label><span>{{ user_data.spouse.sp_profession | default('N/A') }}</span></div>
+                </div>
+            </section>
+            {% endif %}
+
+            <!-- Employment Information Summary -->
+            <section class="summary-section">
+                <h3><i class="fas fa-briefcase"></i> Employment Information</h3>
+                <div class="summary-grid">
+                    <div class="summary-item"><label>Occupation Type:</label><span>{{ user_data.occupation.occ_type | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Nature of Business:</label><span>{{ user_data.occupation.bus_nature | default('N/A') }}</span></div>
+                    {% if user_data.employer_details %}
+                    <div class="summary-item"><label>TIN ID:</label><span>{{ user_data.employer_details.tin_id | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Company Name:</label><span>{{ user_data.employer_details.empname | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Employer Address:</label><span>{{ user_data.employer_details.emp_address | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Employer Phone/Fax:</label><span>{{ user_data.employer_details.phonefax_no | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Job Title:</label><span>{{ user_data.employer_details.job_title | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Employment Date:</label><span>{{ user_data.employer_details.emp_date | default('N/A') }}</span></div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- Financial Information Summary -->
+            <section class="summary-section">
+                <h3><i class="fas fa-money-bill-wave"></i> Financial Information</h3>
+                <div class="summary-grid">
+                    <div class="summary-item"><label>Source of Wealth:</label><span>{{ user_data.financial_record.source_wealth | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Monthly Income:</label><span>{{ user_data.financial_record.mon_income | default('N/A') }}</span></div>
+                    <div class="summary-item"><label>Annual Income:</label><span>{{ user_data.financial_record.ann_income | default('N/A') }}</span></div>
+                </div>
+            </section>
+
+            <!-- Company Affiliations Summary -->
+            <section class="summary-section">
+                <h3><i class="fas fa-building"></i> Company Affiliations</h3>
+                {% if user_data.company_affiliations %}
+                <ul class="list-group list-group-custom">
+                    {% for affiliation in user_data.company_affiliations %}
+                    <li class="list-group-item-custom">
+                        <span>Role: <strong>{{ affiliation.depositor_role | default('N/A') }}</strong></span>
+                        <span>Company: <strong>{{ affiliation.dep_compname | default('N/A') }}</strong></span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="no-records">No company affiliations listed.</div>
+                {% endif %}
+            </section>
+
+            <!-- Existing Bank Accounts Summary -->
+            <section class="summary-section">
+                <h3><i class="fas fa-university"></i> Existing Bank Accounts</h3>
+                {% if user_data.existing_banks %}
+                <ul class="list-group list-group-custom">
+                    {% for bank in user_data.existing_banks %}
+                    <li class="list-group-item-custom">
+                        <span>Bank: <strong>{{ bank.bank_name | default('N/A') }}</strong></span>
+                        <span>Branch: <strong>{{ bank.branch | default('N/A') }}</strong></span>
+                        <span>Account Type: <strong>{{ bank.acc_type | default('N/A') }}</strong></span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="no-records">No existing bank accounts listed.</div>
+                {% endif %}
+            </section>
+
+            <!-- Public Official Relationships Summary -->
+            <section class="summary-section">
+                <h3><i class="fas fa-users-cog"></i> Public Official Relationships</h3>
+                {% if user_data.public_official_relationships %}
+                <ul class="list-group list-group-custom">
+                    {% for po_rel in user_data.public_official_relationships %}
+                    <li class="list-group-item-custom">
+                        <span>Name: <strong>{{ po_rel.gov_int_name | default('N/A') }}</strong></span>
+                        <span>Position: <strong>{{ po_rel.official_position | default('N/A') }}</strong></span>
+                        <span>Org: <strong>{{ po_rel.branch_orgname | default('N/A') }}</strong></span>
+                        <span>Relationship: <strong>{{ po_rel.relation_desc | default('N/A') }}</strong></span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="no-records">No public official relationships listed.</div>
+                {% endif %}
+            </section>
+
+            <div class="form-actions">
+                <button type="button" class="action-btn update-btn" onclick="alert('Update functionality coming soon!');">
+                    <i class="fas fa-edit"></i> Update Account
+                </button>
+                <form action="{{ url_for('logout') }}" method="post" style="display: inline;">
+                    <button type="submit" class="action-btn logout-btn">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
