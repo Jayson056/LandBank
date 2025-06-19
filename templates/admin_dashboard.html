@@ -356,6 +356,12 @@
             align-items: center;
             gap: 0.3em;
         }
+
+        /* User-requested modal scrollability */
+        .modal-dialog-scrollable .modal-body {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
@@ -485,7 +491,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Date of Birth</label>
-                                <input type="date" name="datebirth" class="form-control" required>
+                                <input type="date" name="datebirth" class="form-control">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Nationality</label>
@@ -537,6 +543,14 @@
                             <div class="col-md-6">
                                 <label class="form-label">Contact No</label>
                                 <input type="tel" name="contact_no" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Registration Status</label>
+                                <select name="registration_status" class="form-select" required>
+                                    <option value="Active">Active</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
                             </div>
                             <!-- Spouse Info -->
                             <div class="col-12"><hr><strong>Spouse Information</strong></div>
@@ -600,7 +614,78 @@
                                 <label class="form-label">Annual Income</label>
                                 <input type="number" name="ann_income" class="form-control">
                             </div>
-                            <!-- Company Affiliations, Bank Accounts, Public Official Relationships can be added as dynamic fields in a future step -->
+                            <!-- Company Affiliations -->
+                            <div class="col-12"><hr><strong>Company Affiliations</strong></div>
+                            <div id="modal_company_affiliations_list" class="col-12">
+                                <div class="row g-2 align-items-end mb-2 dynamic-list-item">
+                                    <div class="col-md-5">
+                                        <label class="form-label">Role</label>
+                                        <input type="text" name="depositor_role[]" class="form-control" placeholder="e.g., Shareholder">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label">Company Name</label>
+                                        <input type="text" name="dep_compname[]" class="form-control" placeholder="e.g., ABC Corp">
+                                    </div>
+                                    <div class="col-md-2 d-flex justify-content-end">
+                                        <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-times"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="button" class="btn btn-info btn-sm shiny-btn" id="add_company_affiliation"><i class="fas fa-plus"></i> Add Affiliation</button>
+                            </div>
+                            <!-- Existing Bank Accounts -->
+                            <div class="col-12"><hr><strong>Existing Bank Accounts</strong></div>
+                            <div id="modal_existing_banks_list" class="col-12">
+                                <div class="row g-2 align-items-end mb-2 dynamic-list-item">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Bank Name</label>
+                                        <input type="text" name="bank_name[]" class="form-control" placeholder="e.g., BPI">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Branch</label>
+                                        <input type="text" name="branch[]" class="form-control" placeholder="e.g., Makati">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Account Type</label>
+                                        <input type="text" name="acc_type[]" class="form-control" placeholder="e.g., Savings">
+                                    </div>
+                                    <div class="col-md-1 d-flex justify-content-end">
+                                        <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-times"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="button" class="btn btn-info btn-sm shiny-btn" id="add_existing_bank"><i class="fas fa-plus"></i> Add Bank</button>
+                            </div>
+                            <!-- Public Official Relationships -->
+                            <div class="col-12"><hr><strong>Public Official Relationships</strong></div>
+                            <div id="modal_public_official_relationships_list" class="col-12">
+                                <div class="row g-2 align-items-end mb-2 dynamic-list-item">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Official Name</label>
+                                        <input type="text" name="gov_int_name[]" class="form-control" placeholder="e.g., Juan Dela Cruz">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Position</label>
+                                        <input type="text" name="official_position[]" class="form-control" placeholder="e.g., Mayor">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Branch/Org</label>
+                                        <input type="text" name="branch_orgname[]" class="form-control" placeholder="e.g., LGU Manila">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Relationship</label>
+                                        <input type="text" name="relation_desc[]" class="form-control" placeholder="e.g., Cousin">
+                                    </div>
+                                    <div class="col-md-1 d-flex justify-content-end">
+                                        <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-times"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="button" class="btn btn-info btn-sm shiny-btn" id="add_public_official_relationship"><i class="fas fa-plus"></i> Add PO Relationship</button>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -613,5 +698,134 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Function to add a new item to a dynamic list
+            function addDynamicListItem(listId, templateHtml) {
+                const listContainer = document.getElementById(listId);
+                const newItemDiv = document.createElement('div');
+                newItemDiv.innerHTML = templateHtml;
+                newItemDiv.classList.add('row', 'g-2', 'align-items-end', 'mb-2', 'dynamic-list-item');
+                
+                // Add remove button event listener
+                newItemDiv.querySelector('.remove-item-btn').addEventListener('click', function() {
+                    newItemDiv.remove();
+                    checkAndAddNoRecordsMessage(listContainer);
+                });
+
+                // Remove "No records listed." message if present
+                const noRecordsMessage = listContainer.querySelector('.no-records');
+                if (noRecordsMessage) {
+                    noRecordsMessage.remove();
+                }
+
+                listContainer.appendChild(newItemDiv);
+            }
+
+            // Function to check if a list is empty and add "No records" message
+            function checkAndAddNoRecordsMessage(listContainer) {
+                if (listContainer.querySelectorAll('.dynamic-list-item').length === 0) {
+                    const noRecordsMessage = document.createElement('div');
+                    noRecordsMessage.classList.add('no-records');
+                    noRecordsMessage.textContent = 'No records listed.';
+                    listContainer.appendChild(noRecordsMessage);
+                }
+            }
+
+            // Templates for new dynamic list items
+            const companyAffiliationTemplate = `
+                <div class="col-md-5">
+                    <label class="form-label">Role</label>
+                    <input type="text" name="depositor_role[]" class="form-control" placeholder="e.g., Shareholder">
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Company Name</label>
+                    <input type="text" name="dep_compname[]" class="form-control" placeholder="e.g., ABC Corp">
+                </div>
+                <div class="col-md-2 d-flex justify-content-end">
+                    <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+
+            const existingBankTemplate = `
+                <div class="col-md-4">
+                    <label class="form-label">Bank Name</label>
+                    <input type="text" name="bank_name[]" class="form-control" placeholder="e.g., BPI">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Branch</label>
+                    <input type="text" name="branch[]" class="form-control" placeholder="e.g., Makati">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Account Type</label>
+                    <input type="text" name="acc_type[]" class="form-control" placeholder="e.g., Savings">
+                </div>
+                <div class="col-md-1 d-flex justify-content-end">
+                    <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+
+            const publicOfficialRelationshipTemplate = `
+                <div class="col-md-3">
+                    <label class="form-label">Official Name</label>
+                    <input type="text" name="gov_int_name[]" class="form-control" placeholder="e.g., Juan Dela Cruz">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Position</label>
+                    <input type="text" name="official_position[]" class="form-control" placeholder="e.g., Mayor">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Branch/Org</label>
+                    <input type="text" name="branch_orgname[]" class="form-control" placeholder="e.g., LGU Manila">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Relationship</label>
+                    <input type="text" name="relation_desc[]" class="form-control" placeholder="e.g., Cousin">
+                </div>
+                <div class="col-md-1 d-flex justify-content-end">
+                    <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+
+            // Event listeners for "Add" buttons in the modal
+            document.getElementById('add_company_affiliation').addEventListener('click', function() {
+                addDynamicListItem('modal_company_affiliations_list', companyAffiliationTemplate);
+            });
+
+            document.getElementById('add_existing_bank').addEventListener('click', function() {
+                addDynamicListItem('modal_existing_banks_list', existingBankTemplate);
+            });
+
+            document.getElementById('add_public_official_relationship').addEventListener('click', function() {
+                addDynamicListItem('modal_public_official_relationships_list', publicOfficialRelationshipTemplate);
+            });
+
+            // Initial attachment of event listeners for dynamically added content in the modal
+            // This ensures that if the modal is opened, and it already has content (e.g., due to previous errors
+            // or if it were to be pre-populated), the remove buttons work.
+            // For a fresh modal, these listeners won't find elements initially.
+            document.querySelectorAll('.modal .remove-item-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const itemDiv = this.closest('.dynamic-list-item');
+                    const listContainer = itemDiv.parentNode;
+                    itemDiv.remove();
+                    checkAndAddNoRecordsMessage(listContainer);
+                });
+            });
+
+            // Handle modal show event to ensure "no records" messages are correct
+            const addCustomerModal = document.getElementById('addCustomerModal');
+            addCustomerModal.addEventListener('show.bs.modal', function () {
+                // On modal show, ensure that if lists are empty, the "No records listed." message is present
+                checkAndAddNoRecordsMessage(document.getElementById('modal_company_affiliations_list'));
+                checkAndAddNoRecordsMessage(document.getElementById('modal_existing_banks_list'));
+                checkAndAddNoRecordsMessage(document.getElementById('modal_public_official_relationships_list'));
+            });
+
+            // Add the dynamic list items directly to the `admin_edit_customer.html` as well.
+            // (Note: This JS is in admin_dashboard.html, but the context of adding dynamic fields is usually
+            // more relevant to the edit page. If the add customer modal works, this is a good pattern.)
+        });
+    </script>
 </body>
 </html>
