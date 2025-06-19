@@ -1,25 +1,19 @@
-import psycopg2 # Changed from mysql.connector
+import psycopg2 
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-import uuid # For generating unique IDs
-import os # To access environment variables
-import psycopg2.extras # Import DictCursor for dictionary results
+import uuid 
+import os 
+import psycopg2.extras 
 
-# Import the get_db_url function from db_config
-# Make sure db_config.py is in the same directory or accessible on your Python path
 from db_config import get_db_url
 
 app = Flask(__name__)
-# IMPORTANT: Change this to a strong, unique secret key for production environments
-app.secret_key = os.environ.get('SECRET_KEY', 'your_super_secret_key_here') # Use environment variable for secret key
-
-# Determine debug mode from environment variable. This allows more verbose errors in development.
+app.secret_key = os.environ.get('SECRET_KEY', 'your_super_secret_key_here') 
 debug_mode = os.environ.get('FLASK_DEBUG', 'True') == 'True'
 
 def get_db_connection():
     """Establishes and returns a database connection using psycopg2 for PostgreSQL."""
     try:
         conn_url = get_db_url()
-        # psycopg2 can connect using a full connection string (URL)
         conn = psycopg2.connect(conn_url)
         print("Successfully connected to PostgreSQL database.")
         return conn
@@ -594,8 +588,7 @@ def login():
             session['admin'] = True
             session['user_email'] = email
             flash('Logged in successfully!', 'success')
-            # Changed endpoint name to the explicitly defined one
-            return redirect(url_for('admin_dashboard')) 
+            return redirect(url_for('admin_dashboard_page')) 
 
         conn = None
         cursor = None
@@ -647,13 +640,11 @@ def registration_success():
     """Renders the registration success page."""
     return render_template('registrationSuccess.html')
 
-
 # Explicitly named endpoint for clarity and to resolve potential routing issues
-@app.route('/admin_dashboard', endpoint='admin_dashboard')
+@app.route('/admin_dashboard', endpoint='admin_dashboard_page')
 def admin_dashboard():
     if 'admin' not in session:
         flash('Please login to access the admin dashboard.', 'warning')
-        # Ensure redirect also uses the correct endpoint name if it ever needs to go back here
         return redirect(url_for('login')) 
 
     conn = None
@@ -661,46 +652,194 @@ def admin_dashboard():
     try:
         conn = get_db_connection()
         if not conn:
-            # When debug_mode is True, we want to see the full traceback on the page
-            # Otherwise, redirect with a generic message for production
             if debug_mode:
                 raise Exception("Database connection failed for admin_dashboard.")
             flash('Database connection failed.', 'danger')
             return redirect(url_for('login'))
 
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        cursor.execute("""
-            SELECT c.cust_no, c.custname, c.email_address, c.contact_no
+        
+        # Get query parameters for filtering and searching
+        search_query = request.args.get('search', '').strip()
+        status_filter = request.args.get('status', '').strip()
+        reg_date_filter = request.args.get('reg_date', '').strip()
+
+        sql_query = """
+            SELECT c.cust_no, c.custname, c.email_address, c.contact_no, 
+                   COALESCE(cred.status, 'Active') as status, -- Assuming a 'status' column in credentials or a default
+                   -- Placeholder for registration_date if it exists in customer or is derived
+                   CASE WHEN c.datebirth IS NOT NULL THEN c.datebirth ELSE NULL END AS registration_date
             FROM customer c
-            ORDER BY c.cust_no DESC
-        """)
+            LEFT JOIN credentials cred ON c.cust_no = cred.cust_no -- Assuming credentials table might have a status
+            WHERE 1=1
+        """
+        params = []
+
+        if search_query:
+            sql_query += " AND (c.custname ILIKE %s OR c.email_address ILIKE %s OR c.contact_no ILIKE %s)"
+            params.extend([f"%{search_query}%", f"%{search_query}%", f"%{search_query}%"])
+        
+        # Note: If 'status' is not in 'credentials' table, you'd need to decide where to store it
+        # For now, COALESCE is used to give a default 'Active' status.
+        # If you add a `registration_status` column to the `customer` table, use that.
+        if status_filter and status_filter != 'All Statuses':
+            sql_query += " AND COALESCE(cred.status, 'Active') = %s"
+            params.append(status_filter)
+
+        if reg_date_filter:
+            sql_query += " AND c.datebirth = %s" # Assuming datebirth can act as registration_date
+            params.append(reg_date_filter)
+
+        sql_query += " ORDER BY c.custname ASC" # Order by name for consistency
+
+        cursor.execute(sql_query, params)
         customers = cursor.fetchall()
 
         # Convert UUID objects to strings for display in HTML template
         for customer in customers:
-            customer['cust_no'] = str(customer['cust_no'])
+            customer_dict = dict(customer) # Convert row to dictionary for modification
+            customer_dict['cust_no'] = str(customer_dict['cust_no'])
+            # Ensure 'status' is present for display, falling back to 'Active' if not in DB
+            customer_dict['status'] = customer_dict.get('status') or 'Active' 
+            # Format date for display if needed
+            if customer_dict.get('registration_date'):
+                customer_dict['registration_date'] = customer_dict['registration_date'].strftime('%Y-%m-%d')
+
+            # This converts the psycopg2.extras.DictRow to a regular dict.
+            # You might need to adjust other parts of admin_dashboard.html if it expects DictRow behavior.
+            customers[customers.index(customer)] = customer_dict 
 
         return render_template('admin_dashboard.html', customers=customers)
 
     except psycopg2.Error as err:
         print(f"Database error in admin_dashboard: {err}")
-        # In debug mode, raise the error to get the full traceback in browser
         if debug_mode:
             raise
         flash(f'An error occurred while loading the dashboard: {err}', 'danger')
-        return redirect(url_for('login')) # Fallback to login on error
+        return redirect(url_for('login')) 
     except Exception as e:
         print(f"Error in admin_dashboard: {e}")
-        # In debug mode, raise the error to get the full traceback in browser
         if debug_mode:
             raise
         flash('An unexpected error occurred while loading the dashboard.', 'danger')
-        return redirect(url_for('login')) # Fallback to login on error
+        return redirect(url_for('login')) 
     finally:
         if cursor:
             cursor.close()
         if conn:
             conn.close()
+
+# --- NEW ROUTE: Admin Add Customer ---
+@app.route('/admin/add_customer', methods=['POST'])
+def admin_add_customer():
+    if 'admin' not in session:
+        flash('Please login to access this function.', 'warning')
+        return redirect(url_for('login'))
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            flash('Database connection failed.', 'danger')
+            return redirect(url_for('admin_dashboard_page'))
+
+        cursor = conn.cursor()
+        conn.autocommit = False # Start a transaction
+
+        # --- Extract form data for Customer table ---
+        custname = request.form.get('custname')
+        datebirth = request.form.get('datebirth')
+        nationality = request.form.get('nationality')
+        citizenship = request.form.get('citizenship')
+        custsex = request.form.get('custsex')
+        placebirth = request.form.get('placebirth')
+        civilstatus = request.form.get('civilstatus')
+        num_children = int(request.form.get('num_children') or 0)
+        mmaiden_name = request.form.get('mmaiden_name')
+        cust_address = request.form.get('cust_address')
+        email_address = request.form.get('email_address')
+        contact_no = request.form.get('contact_no')
+
+        # --- Insert into Financial Record table ---
+        # Assuming no complex source_wealth for quick add, just basic income
+        source_wealth = request.form.get('source_wealth') or 'Unspecified'
+        mon_income = request.form.get('mon_income') or '0'
+        ann_income = request.form.get('ann_income') or '0'
+        sql_fin = "INSERT INTO financial_record (source_wealth, mon_income, ann_income) VALUES (%s, %s, %s) RETURNING fin_code;"
+        cursor.execute(sql_fin, (source_wealth, mon_income, ann_income))
+        fin_code = cursor.fetchone()[0]
+
+        # --- Insert into Occupation table ---
+        # Assuming simple occupation data for quick add
+        occ_type = request.form.get('occ_type') or 'Unspecified'
+        bus_nature = request.form.get('bus_nature') or 'General'
+        sql_occ = "INSERT INTO occupation (occ_type, bus_nature) VALUES (%s, %s) RETURNING occ_id;"
+        cursor.execute(sql_occ, (occ_type, bus_nature))
+        occ_id = cursor.fetchone()[0]
+
+        # --- Insert into Customer table ---
+        sql_cust = """INSERT INTO customer (custname, datebirth, nationality, citizenship, custsex, placebirth, civilstatus, num_children, mmaiden_name, cust_address, email_address, contact_no, occ_id, fin_code)
+                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cust_no;"""
+        customer_data = (
+            custname, datebirth, nationality, citizenship,
+            custsex, placebirth, civilstatus,
+            num_children,
+            mmaiden_name, cust_address,
+            email_address, contact_no, occ_id, fin_code
+        )
+        cursor.execute(sql_cust, customer_data)
+        cust_no = cursor.fetchone()[0] # Get the newly generated cust_no
+
+        # --- Insert into Credentials table (using email as username, generate a simple password) ---
+        insert_credentials(cursor, cust_no, {'email': email_address}) # Reuse helper
+
+        # --- Insert into Spouse table (if married and data provided) ---
+        sp_name = request.form.get('sp_name')
+        sp_datebirth = request.form.get('sp_datebirth')
+        sp_profession = request.form.get('sp_profession')
+        if civilstatus == 'Married' and sp_name and sp_datebirth and sp_profession:
+            sql_spouse = "INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession) VALUES (%s, %s, %s, %s);"
+            cursor.execute(sql_spouse, (str(cust_no), sp_name, sp_datebirth, sp_profession))
+
+        # --- Insert into Employer Details and Employment Details if applicable ---
+        if occ_type == 'Employed': # Assuming 'Employed' matches the input from occ_type
+            tin_id = request.form.get('tin_id')
+            empname = request.form.get('empname')
+            emp_address = request.form.get('emp_address')
+            phonefax_no = request.form.get('phonefax_no')
+            job_title = request.form.get('job_title')
+            emp_date = request.form.get('emp_date') or '2000-01-01' # Default if not provided
+
+            if empname: # Only insert if employer name is provided
+                sql_emp_details = "INSERT INTO employer_details (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING emp_id;"
+                cursor.execute(sql_emp_details, (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
+                emp_id = cursor.fetchone()[0]
+                sql_emp_link = "INSERT INTO employment_details (cust_no, emp_id) VALUES (%s, %s);"
+                cursor.execute(sql_emp_link, (str(cust_no), emp_id))
+
+        conn.commit()
+        flash('Customer added successfully!', 'success')
+        return redirect(url_for('admin_dashboard_page'))
+
+    except psycopg2.Error as err:
+        if conn:
+            conn.rollback()
+        print(f"Database error during add customer: {err}")
+        flash(f'An error occurred during adding customer: {err}', 'danger')
+        return redirect(url_for('admin_dashboard_page'))
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Unexpected error during add customer: {e}")
+        flash('An unexpected error occurred during adding customer.', 'danger')
+        return redirect(url_for('admin_dashboard_page'))
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
 
 # --- ROUTE: Admin View Customer Details ---
 @app.route('/admin/customer/<uuid:cust_no>') # Use <uuid:cust_no> for automatic UUID conversion
@@ -719,7 +858,7 @@ def admin_view_customer(cust_no):
             if debug_mode:
                 raise Exception("Database connection failed for admin_view_customer.")
             flash('Database connection failed.', 'danger')
-            return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
 
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
@@ -735,7 +874,7 @@ def admin_view_customer(cust_no):
 
         if not user_data['customer']:
             flash(f'Customer with ID {cust_no} not found.', 'danger')
-            return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
 
         # Separate the fetched data for clarity in the template
         user_data['occupation'] = {
@@ -749,7 +888,7 @@ def admin_view_customer(cust_no):
         }
 
         # Fetch Spouse Information (if exists)
-        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (str(cust_no),)) # CONVERT UUID TO STRING HERE
+        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (str(cust_no),)) # Convert cust_no to string
         user_data['spouse'] = cursor.fetchone()
 
         # Fetch Employer Details (if exists, linked via employment_details and occupation)
@@ -759,13 +898,13 @@ def admin_view_customer(cust_no):
                 FROM employer_details ed
                 JOIN employment_details empd ON ed.emp_id = empd.emp_id
                 WHERE empd.cust_no = %s
-            """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
+            """, (str(cust_no),)) # Convert cust_no to string
             user_data['employer_details'] = cursor.fetchone()
         else:
             user_data['employer_details'] = None
 
         # Fetch Company Affiliations
-        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (str(cust_no),)) # CONVERT UUID TO STRING HERE
+        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (str(cust_no),)) # Convert cust_no to string
         user_data['company_affiliations'] = cursor.fetchall()
 
         # Fetch Existing Bank Accounts
@@ -774,7 +913,7 @@ def admin_view_customer(cust_no):
             FROM existing_bank eb
             JOIN bank_details bd ON eb.bank_code = bd.bank_code
             WHERE eb.cust_no = %s
-        """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
+        """, (str(cust_no),)) # Convert cust_no to string
         user_data['existing_banks'] = cursor.fetchall()
 
         # Fetch Public Official Relationships
@@ -783,7 +922,7 @@ def admin_view_customer(cust_no):
             FROM cust_po_relationship cpr
             JOIN public_official_details pod ON cpr.gov_int_id = pod.gov_int_id
             WHERE cpr.cust_no = %s
-        """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
+        """, (str(cust_no),)) # Convert cust_no to string
         user_data['public_official_relationships'] = cursor.fetchall()
 
         # Render the template, passing all collected data in 'user_data'
@@ -794,13 +933,13 @@ def admin_view_customer(cust_no):
         if debug_mode:
             raise
         flash(f'An error occurred while fetching customer data: {err}', 'danger')
-        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
     except Exception as e:
         print(f"Error in admin_view_customer: {e}")
         if debug_mode:
             raise
         flash('An unexpected error occurred while loading customer details.', 'danger')
-        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
     finally:
         if cursor:
             cursor.close()
@@ -824,7 +963,7 @@ def admin_edit_customer(cust_no):
             if debug_mode:
                 raise Exception("Database connection failed for admin_edit_customer.")
             flash('Database connection failed.', 'danger')
-            return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
 
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
@@ -1006,7 +1145,7 @@ def admin_edit_customer(cust_no):
 
         if not customer_data['customer']:
             flash(f'Customer with ID {cust_no} not found.', 'danger')
-            return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
 
         # Separate the fetched data for clarity in the template
         customer_data['occupation'] = {
@@ -1064,13 +1203,13 @@ def admin_edit_customer(cust_no):
         if debug_mode:
             raise
         flash(f'An error occurred while fetching customer data: {err}', 'danger')
-        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
     except Exception as e:
         print(f"Error in admin_edit_customer: {e}")
         if debug_mode:
             raise
         flash('An unexpected error occurred while loading customer details for editing.', 'danger')
-        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
     finally:
         if cursor:
             cursor.close()
@@ -1087,7 +1226,7 @@ def delete_customer():
     cust_no = request.form.get('cust_no')
     if not cust_no:
         flash('Customer ID is missing for deletion.', 'danger')
-        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
 
     conn = None
     cursor = None
@@ -1097,7 +1236,7 @@ def delete_customer():
             if debug_mode:
                 raise Exception("Database connection failed for delete_customer.")
             flash('Database connection failed.', 'danger')
-            return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
 
         cursor = conn.cursor()
         conn.autocommit = False # Start a transaction
@@ -1137,7 +1276,7 @@ def delete_customer():
 
         conn.commit() # Commit the transaction if all deletions are successful
         flash(f'Customer {cust_no} and all related records deleted successfully!', 'success')
-        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
 
     except psycopg2.Error as err:
         conn.rollback() # Rollback on error
@@ -1145,7 +1284,7 @@ def delete_customer():
         if debug_mode:
             raise
         flash(f'An error occurred during deletion: {err}', 'danger')
-        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
     except Exception as e:
         if conn: # Check if conn exists before trying to rollback
             conn.rollback()
@@ -1153,7 +1292,7 @@ def delete_customer():
         if debug_mode:
             raise
         flash('An unexpected error occurred during customer deletion.', 'danger')
-        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
     finally:
         if cursor:
             cursor.close()
@@ -1163,10 +1302,6 @@ def delete_customer():
 
 # --- Main execution block ---
 if __name__ == '__main__':
-    # For Render, the PORT will be provided by an environment variable
-    port = int(os.environ.get('PORT', 5000)) # Default to 5000 if PORT env var is not set
-    # In a production environment, debug should be False
-    # debug_mode is already defined globally
-    
+    port = int(os.environ.get('PORT', 5000)) 
     _ensure_database_schema() # Run schema check/update on app startup
     app.run(host='0.0.0.0', port=port, debug=debug_mode)
