@@ -238,6 +238,63 @@ def landing():
     """Renders the landing page."""
     return render_template('landing.html')
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('username')
+        password_input = request.form.get('password')
+
+        if email == 'admin@gmail.com' and password_input == 'LandBank@2025':
+            session['admin'] = True
+            session['user_email'] = email
+            flash('Logged in successfully!', 'success')
+            return redirect(url_for('admin_dashboard'))
+
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            if not conn:
+                flash('Database connection failed.', 'danger')
+                return render_template('login.html', error='Database connection failed.')
+
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+            cursor.execute("""
+                SELECT credentials.cust_no, username, password, customer.custname
+                FROM credentials
+                JOIN customer ON credentials.cust_no = customer.cust_no
+                WHERE username = %s
+            """, (email,))
+            user = cursor.fetchone()
+
+            if user and user['password'] == password_input: # IMPORTANT: Replace with hashed password comparison in production
+                session['user'] = user['custname']
+                session['user_email'] = user['username']
+                session['cust_no'] = str(user['cust_no']) # Store as string, as UUID object might cause issues in session
+
+                flash('Logged in successfully!', 'success')
+                return redirect(url_for('userHome'))
+            else:
+                flash('Invalid username or password.', 'danger')
+                return render_template('login.html', error='Invalid username or password.')
+
+        except psycopg2.Error as err:
+            print(f"Database error during login: {err}")
+            flash(f'An error occurred during login: {err}', 'danger')
+            return render_template('login.html', error=f"Database error during login: {err}")
+        except Exception as e:
+            print(f"Login error: {e}")
+            flash('An unexpected error occurred during login.', 'danger')
+            return render_template('login.html', error='An unexpected error occurred during login.')
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    return render_template('login.html')
+
 @app.route('/home')
 def home():
     """Renders the home page."""
