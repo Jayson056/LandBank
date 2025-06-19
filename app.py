@@ -595,7 +595,7 @@ def login():
             session['user_email'] = email
             flash('Logged in successfully!', 'success')
             # Changed endpoint name to the explicitly defined one
-            return redirect(url_for('admin_dashboard_page')) 
+            return redirect(url_for('admin_dashboard')) 
 
         conn = None
         cursor = None
@@ -648,7 +648,7 @@ def registration_success():
     return render_template('registrationSuccess.html')
 
 # Explicitly named endpoint for clarity and to resolve potential routing issues
-@app.route('/admin_dashboard', endpoint='admin_dashboard_page')
+@app.route('/admin_dashboard', endpoint='admin_dashboard')
 def admin_dashboard():
     if 'admin' not in session:
         flash('Please login to access the admin dashboard.', 'warning')
@@ -718,7 +718,7 @@ def admin_view_customer(cust_no):
             if debug_mode:
                 raise Exception("Database connection failed for admin_view_customer.")
             flash('Database connection failed.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard')) # Use explicit endpoint
 
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
@@ -734,7 +734,7 @@ def admin_view_customer(cust_no):
 
         if not user_data['customer']:
             flash(f'Customer with ID {cust_no} not found.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard')) # Use explicit endpoint
 
         # Separate the fetched data for clarity in the template
         user_data['occupation'] = {
@@ -793,13 +793,13 @@ def admin_view_customer(cust_no):
         if debug_mode:
             raise
         flash(f'An error occurred while fetching customer data: {err}', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
     except Exception as e:
         print(f"Error in admin_view_customer: {e}")
         if debug_mode:
             raise
         flash('An unexpected error occurred while loading customer details.', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
     finally:
         if cursor:
             cursor.close()
@@ -823,7 +823,7 @@ def admin_edit_customer(cust_no):
             if debug_mode:
                 raise Exception("Database connection failed for admin_edit_customer.")
             flash('Database connection failed.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard')) # Use explicit endpoint
 
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
@@ -1005,7 +1005,7 @@ def admin_edit_customer(cust_no):
 
         if not customer_data['customer']:
             flash(f'Customer with ID {cust_no} not found.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard')) # Use explicit endpoint
 
         # Separate the fetched data for clarity in the template
         customer_data['occupation'] = {
@@ -1063,13 +1063,13 @@ def admin_edit_customer(cust_no):
         if debug_mode:
             raise
         flash(f'An error occurred while fetching customer data: {err}', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
     except Exception as e:
         print(f"Error in admin_edit_customer: {e}")
         if debug_mode:
             raise
         flash('An unexpected error occurred while loading customer details for editing.', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
     finally:
         if cursor:
             cursor.close()
@@ -1086,7 +1086,7 @@ def delete_customer():
     cust_no = request.form.get('cust_no')
     if not cust_no:
         flash('Customer ID is missing for deletion.', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
 
     conn = None
     cursor = None
@@ -1096,7 +1096,7 @@ def delete_customer():
             if debug_mode:
                 raise Exception("Database connection failed for delete_customer.")
             flash('Database connection failed.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+            return redirect(url_for('admin_dashboard')) # Use explicit endpoint
 
         cursor = conn.cursor()
         conn.autocommit = False # Start a transaction
@@ -1136,7 +1136,7 @@ def delete_customer():
 
         conn.commit() # Commit the transaction if all deletions are successful
         flash(f'Customer {cust_no} and all related records deleted successfully!', 'success')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
 
     except psycopg2.Error as err:
         conn.rollback() # Rollback on error
@@ -1144,7 +1144,7 @@ def delete_customer():
         if debug_mode:
             raise
         flash(f'An error occurred during deletion: {err}', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
     except Exception as e:
         if conn: # Check if conn exists before trying to rollback
             conn.rollback()
@@ -1152,7 +1152,7 @@ def delete_customer():
         if debug_mode:
             raise
         flash('An unexpected error occurred during customer deletion.', 'danger')
-        return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+        return redirect(url_for('admin_dashboard')) # Use explicit endpoint
     finally:
         if cursor:
             cursor.close()
