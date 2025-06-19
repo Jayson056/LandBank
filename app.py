@@ -353,16 +353,13 @@ def submit_registration():
         sql_cust = """INSERT INTO customer (custname, datebirth, nationality, citizenship, custsex, placebirth, civilstatus, num_children, mmaiden_name, cust_address, email_address, contact_no, occ_id, fin_code, registration_status)
                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cust_no;"""
         customer_data = (
-            custname, datebirth, nationality, citizenship,
-            custsex, placebirth, civilstatus,
-            num_children,
-            mmaiden_name, cust_address,
-            email_address, contact_no, occ_id, fin_code, registration_status
+            custname, datebirth, nationality, citizenship, custsex,
+            placebirth, civilstatus, num_children, mmaiden_name,
+            cust_address, email_address, contact_no, occ_id, fin_code,
+            registration_status
         )
-
         cursor.execute(sql_cust, customer_data)
         cust_no = cursor.fetchone()[0] # Fetch the generated UUID for cust_no
-
         print(f"--- DEBUG: Successfully inserted customer. New cust_no: {cust_no} (Type: {type(cust_no)}) ---")
 
         # --- 4. Insert into employer_details and employment_details if applicable ---
@@ -371,10 +368,9 @@ def submit_registration():
             empname = r2.get('companyName', '')
             emp_address = r2.get('employerAddress', '')
             phonefax_no = r2.get('employerPhone', '')
-            emp_date_str = r2.get('employmentDate') 
+            emp_date_str = r2.get('employmentDate')
             emp_date = emp_date_str if emp_date_str else None # Handle empty date string
             job_title = r2.get('jobTitle', '')
-
 
             sql_emp_details = "INSERT INTO employer_details (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING emp_id;"
             cursor.execute(sql_emp_details, (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
@@ -389,368 +385,505 @@ def submit_registration():
             sp_datebirth_str = r1.get('spouseDob')
             sp_datebirth = sp_datebirth_str if sp_datebirth_str else None # Handle empty date string
             sp_profession = r1.get('spouseProfession')
+
             if sp_name.strip() and sp_profession and sp_datebirth: # Only insert if all spouse fields are non-empty
-                sql_spouse = "INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession) VALUES (%s, %s, %s, %s) ON CONFLICT (cust_no) DO UPDATE SET sp_name = EXCLUDED.sp_name, sp_datebirth = EXCLUDED.sp_datebirth, sp_profession = EXCLUDED.sp_profession;"
+                sql_spouse = "INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession) VALUES (%s, %s, %s, %s);"
                 cursor.execute(sql_spouse, (cust_no, sp_name, sp_datebirth, sp_profession))
 
-        # --- 6. Insert into company_affiliation ---
-        roles = r3.get('depositorRole', [])
-        companies = r3.get('companyName', [])
-        if not isinstance(roles, list): roles = [roles] if roles else []
-        if not isinstance(companies, list): companies = [companies] if companies else []
+        # --- 6. Insert into company_affiliation if applicable ---
+        depositor_role = r3.get('depositorRole')
+        dep_compname = r3.get('companyName')
+        if depositor_role or dep_compname:
+            sql_company = "INSERT INTO company_affiliation (cust_no, depositor_role, dep_compname) VALUES (%s, %s, %s);"
+            cursor.execute(sql_company, (cust_no, depositor_role, dep_compname))
 
-        for role, company in zip(roles, companies):
-            if role and company:
-                sql_comp_aff = "INSERT INTO company_affiliation (cust_no, depositor_role, dep_compname) VALUES (%s, %s, %s) ON CONFLICT (cust_no, depositor_role, dep_compname) DO NOTHING;"
-                cursor.execute(sql_comp_aff, (cust_no, role, company))
+        # --- 7. Insert into existing_bank if applicable ---
+        bank_code = r3.get('bankCode')
+        acc_type = r3.get('accountType')
+        if bank_code and acc_type:
+            # You might want to validate bank_code against your bank_details table here
+            sql_bank = "INSERT INTO existing_bank (cust_no, bank_code, acc_type) VALUES (%s, %s, %s);"
+            cursor.execute(sql_bank, (cust_no, bank_code, acc_type))
+            
+        # --- 8. Insert into public_official_details and cust_po_relationship if applicable ---
+        gov_int_name = r3.get('governmentOfficialName')
+        official_position = r3.get('officialPosition')
+        branch_orgname = r3.get('branchOrgName')
+        relation_desc = r3.get('relationshipNature')
 
-        # --- 7. Insert into bank_details and existing_bank ---
-        banks = r3.get('bank', [])
-        branches = r3.get('branch', [])
-        acc_types = r3.get('accountType', [])
-        if not isinstance(banks, list): banks = [banks] if banks else []
-        if not isinstance(branches, list): branches = [branches] if branches else []
-        if not isinstance(acc_types, list): acc_types = [acc_types] if acc_types else []
+        if gov_int_name or official_position or branch_orgname or relation_desc:
+            # Check if this public official already exists to avoid duplicates
+            cursor.execute("SELECT gov_int_id FROM public_official_details WHERE gov_int_name = %s AND official_position = %s;",
+                           (gov_int_name, official_position))
+            existing_po = cursor.fetchone()
+            
+            gov_int_id = None
+            if existing_po:
+                gov_int_id = existing_po[0]
+            else:
+                # If not, insert new public official
+                sql_po = "INSERT INTO public_official_details (gov_int_name, official_position, branch_orgname) VALUES (%s, %s, %s) RETURNING gov_int_id;"
+                cursor.execute(sql_po, (gov_int_name, official_position, branch_orgname))
+                gov_int_id = cursor.fetchone()[0]
 
-        for bank_name, branch, acc_type in zip(banks, branches, acc_types):
-            if bank_name and branch and acc_type:
-                # Use ON CONFLICT DO NOTHING for bank_details instead of INSERT IGNORE
-                sql_insert_bank = "INSERT INTO bank_details (bank_code, bank_name, branch) VALUES (%s, %s, %s) ON CONFLICT (bank_code) DO NOTHING;"
-                cursor.execute(sql_insert_bank, (bank_name, bank_name, branch))
+            # Link customer to public official
+            if gov_int_id:
+                sql_po_rel = "INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc) VALUES (%s, %s, %s);"
+                cursor.execute(sql_po_rel, (cust_no, gov_int_id, relation_desc))
 
-                sql_existing_bank = "INSERT INTO existing_bank (cust_no, bank_code, acc_type) VALUES (%s, %s, %s) ON CONFLICT (cust_no, bank_code, acc_type) DO NOTHING;"
-                cursor.execute(sql_existing_bank, (cust_no, bank_name, acc_type))
 
-        # --- 8. Insert into public_official_details and cust_po_relationship ---
-        gov_last_names = r3.get('govLastName', [])
-        gov_first_names = r3.get('govFirstName', [])
-        relationships = r3.get('relationship', [])
-        positions = r3.get('position', [])
-        org_names = r3.get('govBranchOrgName', [])
+        conn.commit() # Commit all changes if everything is successful
+        flash('Registration successful! Please proceed to login.', 'success')
+        return jsonify(success=True, cust_no=str(cust_no)), 200
 
-        if not isinstance(gov_last_names, list): gov_last_names = [gov_last_names] if gov_last_names else []
-        if not isinstance(gov_first_names, list): gov_first_names = [gov_first_names] if gov_first_names else []
-        if not isinstance(relationships, list): relationships = [relationships] if relationships else []
-        if not isinstance(positions, list): positions = [positions] if positions else []
-        if not isinstance(org_names, list): org_names = [org_names] if org_names else []
-
-        min_len = min(len(gov_last_names), len(gov_first_names), len(relationships), len(positions), len(org_names))
-        for i in range(min_len):
-            # Only process if essential fields are not empty
-            if gov_last_names[i] and gov_first_names[i] and relationships[i] and positions[i] and org_names[i]:
-                gov_name = f"{gov_first_names[i]} {gov_last_names[i]}"
-                # Check if PO already exists to avoid duplicates
-                cursor.execute("SELECT gov_int_id FROM public_official_details WHERE gov_int_name = %s AND official_position = %s AND branch_orgname = %s;",
-                               (gov_name, positions[i], org_names[i]))
-                po_exists = cursor.fetchone()
-
-                if po_exists:
-                    gov_int_id = po_exists[0]
-                else:
-                    sql_po_details = "INSERT INTO public_official_details (gov_int_name, official_position, branch_orgname) VALUES (%s, %s, %s) RETURNING gov_int_id;"
-                    cursor.execute(sql_po_details, (gov_name, positions[i], org_names[i]))
-                    gov_int_id = cursor.fetchone()[0] # Fetch the generated UUID
-
-                sql_po_rel = "INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc) VALUES (%s, %s, %s) ON CONFLICT (cust_no, gov_int_id) DO NOTHING;"
-                cursor.execute(sql_po_rel, (cust_no, gov_int_id, relationships[i]))
-
-        # --- 9. Call insert_credentials here to save username and password ---
-        insert_credentials(cursor, cust_no, r1)
-
-        conn.commit() # Commit the entire transaction
-        return '', 200
-
-    except psycopg2.Error as err:
-        if conn:
-            conn.rollback()
-        print(f"Error during registration submission: {err}")
-        return f"Database error during submission: {err}", 500
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        print(f"Unexpected error during registration submission: {e}")
-        return f"An unexpected error occurred: {e}", 500
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-# --- Helper Function Definitions (Called from submit_registration and admin_add_customer) ---
-def insert_credentials(cursor, cust_no, data):
-    """
-    Inserts user credentials into the credentials table.
-    """
-    username = data.get('email')
-    # IMPORTANT: In a real application, you MUST hash passwords.
-    # For now, using a default password based on cust_no for demonstration.
-    password = f"defaultPass{cust_no}"
-
-    sql = """
-        INSERT INTO credentials (cust_no, username, password)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (cust_no, username) DO UPDATE SET password = EXCLUDED.password;
-    """
-    cursor.execute(sql, (str(cust_no), username, password)) # Cast UUID to string for psycopg2
-
-# --- Placeholder for other Flask routes and functions ---
-@app.route('/userHome')
-def userHome():
-    if 'cust_no' not in session:
-        flash('Please log in to access this page.', 'info')
-        return redirect(url_for('login'))
-
-    cust_no = session['cust_no']
-    conn = None
-    cursor = None
-    user_data = {}
-
-    try:
-        conn = get_db_connection()
-        if not conn:
-            flash('Database connection failed.', 'danger')
-            return render_template('login.html', error='Database connection failed.')
-
-        # Use cursor_factory to get dictionary results for easier access
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
-        # Fetch Customer Information
-        cursor.execute("""
-            SELECT c.*, o.occ_type, o.bus_nature, f.source_wealth, f.mon_income, f.ann_income
-            FROM customer c
-            LEFT JOIN occupation o ON c.occ_id = o.occ_id
-            LEFT JOIN financial_record f ON c.fin_code = f.fin_code
-            WHERE c.cust_no = %s
-        """, (str(cust_no),)) # Convert cust_no to string for psycopg2
-        user_data['customer'] = cursor.fetchone()
-
-        if not user_data['customer']:
-            flash('Customer data not found.', 'danger')
-            return redirect(url_for('login'))
-
-        # Separate the fetched data for clarity in the template, though already joined
-        user_data['occupation'] = {
-            'occ_type': user_data['customer'].get('occ_type'),
-            'bus_nature': user_data['customer'].get('bus_nature')
-        }
-        user_data['financial_record'] = {
-            'source_wealth': user_data['customer'].get('source_wealth'),
-            'mon_income': user_data['customer'].get('mon_income'),
-            'ann_income': user_data['customer'].get('ann_income')
-        }
-
-        # Fetch Spouse Information (if exists)
-        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (str(cust_no),)) # Convert cust_no to string
-        user_data['spouse'] = cursor.fetchone()
-
-        # Fetch Employer Details (if exists, linked via employment_details and occupation)
-        if user_data['occupation']['occ_type'] == 'Employed':
-            cursor.execute("""
-                SELECT ed.*
-                FROM employer_details ed
-                JOIN employment_details empd ON ed.emp_id = empd.emp_id
-                WHERE empd.cust_no = %s
-            """, (str(cust_no),)) # Convert cust_no to string
-            user_data['employer_details'] = cursor.fetchone()
+    except psycopg2.IntegrityError as err:
+        conn.rollback()
+        print(f"Database Integrity Error during registration: {err}")
+        if "customer_email_address_key" in str(err):
+            flash('Email address already registered. Please use a different email or login.', 'danger')
+            return jsonify(success=False, message='Email address already registered.'), 409 # Conflict
+        elif "credentials_username_key" in str(err):
+            flash('Username already taken. Please choose a different username.', 'danger')
+            return jsonify(success=False, message='Username already taken.'), 409
+        elif "bank_details" in str(err):
+            flash('Invalid Bank Code provided.', 'danger')
+            return jsonify(success=False, message='Invalid Bank Code.'), 400
         else:
-            user_data['employer_details'] = None
-
-        # Fetch Company Affiliations
-        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (str(cust_no),)) # Convert cust_no to string
-        user_data['company_affiliations'] = cursor.fetchall()
-
-        # Fetch Existing Bank Accounts
-        cursor.execute("""
-            SELECT eb.acc_type, bd.bank_name, bd.branch
-            FROM existing_bank eb
-            JOIN bank_details bd ON eb.bank_code = bd.bank_code
-            WHERE eb.cust_no = %s
-        """, (str(cust_no),)) # Convert cust_no to string
-        user_data['existing_banks'] = cursor.fetchall()
-
-        # Fetch Public Official Relationships
-        cursor.execute("""
-            SELECT cpr.relation_desc, pod.gov_int_name, pod.official_position, pod.branch_orgname
-            FROM cust_po_relationship cpr
-            JOIN public_official_details pod ON cpr.gov_int_id = pod.gov_int_id
-            WHERE cpr.cust_no = %s
-        """, (str(cust_no),)) # Convert cust_no to string
-        user_data['public_official_relationships'] = cursor.fetchall()
-
-        return render_template('userHome.html', user_data=user_data)
-
+            flash(f'A database integrity error occurred: {err}', 'danger')
+            return jsonify(success=False, message='A database integrity error occurred.'), 500
     except psycopg2.Error as err:
-        print(f"Database error in userHome: {err}")
-        flash(f'An error occurred while fetching your data: {err}', 'danger')
-        return redirect(url_for('login'))
+        conn.rollback() # Rollback on any database error
+        print(f"Database error during registration: {err}")
+        if debug_mode:
+            raise # Re-raise in debug mode to see full traceback
+        flash(f'An error occurred during registration: {err}', 'danger')
+        return jsonify(success=False, message='An error occurred during registration.'), 500
     except Exception as e:
-        print(f"Error in userHome: {e}")
-        flash('An unexpected error occurred while loading your profile.', 'danger')
-        return redirect(url_for('login'))
+        if conn: # Ensure conn exists before trying to rollback
+            conn.rollback()
+        print(f"Unexpected error during registration: {e}")
+        if debug_mode:
+            raise # Re-raise in debug mode to see full traceback
+        flash('An unexpected error occurred during registration.', 'danger')
+        return jsonify(success=False, message='An unexpected error occurred during registration.'), 500
     finally:
+        # Ensure cursor and connection are closed
         if cursor:
             cursor.close()
         if conn:
             conn.close()
 
-@app.route('/logout', methods=['POST'])
-def logout():
-    session.pop('user', None)
-    session.pop('user_email', None)
-    session.pop('cust_no', None)
-    flash('You have been logged out.', 'info')
-    return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    """Handles user login."""
     if request.method == 'POST':
-        email = request.form.get('username')
-        password_input = request.form.get('password')
-
-        if email == 'admin@gmail.com' and password_input == 'LandBank@2025':
-            session['admin'] = True
-            session['user_email'] = email
-            flash('Logged in successfully!', 'success')
-            return redirect(url_for('admin_dashboard_page')) 
-
+        username = request.form['username']
+        password = request.form['password']
         conn = None
         cursor = None
         try:
             conn = get_db_connection()
             if not conn:
                 flash('Database connection failed.', 'danger')
-                return render_template('login.html', error='Database connection failed.')
+                return redirect(url_for('login'))
 
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor) # Use DictCursor for easy column access
+            
+            # Fetch user credentials along with customer and user_role details
             cursor.execute("""
-                SELECT credentials.cust_no, username, password, customer.custname
-                FROM credentials
-                JOIN customer ON credentials.cust_no = customer.cust_no
-                WHERE username = %s
-            """, (email,))
+                SELECT 
+                    cred.cust_no, cred.username, cred.password, 
+                    c.custname, c.registration_status,
+                    CASE 
+                        WHEN EXISTS (SELECT 1 FROM admins WHERE cust_no = cred.cust_no) THEN 'Admin'
+                        ELSE 'Customer'
+                    END as user_role
+                FROM credentials cred
+                JOIN customer c ON cred.cust_no = c.cust_no
+                WHERE cred.username = %s;
+            """, (username,))
             user = cursor.fetchone()
 
-            if user and user['password'] == password_input: # IMPORTANT: Replace with hashed password comparison in production
-                session['user'] = user['custname']
-                session['user_email'] = user['username']
-                session['cust_no'] = str(user['cust_no']) # Store as string, as UUID object might cause issues in session
-
-                flash('Logged in successfully!', 'success')
-                return redirect(url_for('userHome'))
+            if user:
+                # In a real application, use bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8'))
+                # For this example, we'll do a direct string compare (NOT SECURE FOR PRODUCTION)
+                if password == user['password']: # Replace with secure password hashing check
+                    session['logged_in'] = True
+                    session['username'] = user['username']
+                    session['cust_no'] = str(user['cust_no'])
+                    session['user_role'] = user['user_role']
+                    flash('Logged in successfully!', 'success')
+                    if session['user_role'] == 'Admin':
+                        return redirect(url_for('admin_dashboard_page'))
+                    else:
+                        return redirect(url_for('customer_dashboard_page')) # Redirect regular customers
+                else:
+                    flash('Invalid username or password.', 'danger')
             else:
                 flash('Invalid username or password.', 'danger')
-                return render_template('login.html', error='Invalid username or password.')
 
         except psycopg2.Error as err:
             print(f"Database error during login: {err}")
-            flash(f'An error occurred during login: {err}', 'danger')
-            return render_template('login.html', error=f"Database error during login: {err}")
+            flash(f'An error occurred: {err}', 'danger')
         except Exception as e:
-            print(f"Login error: {e}")
+            print(f"Error during login: {e}")
             flash('An unexpected error occurred during login.', 'danger')
-            return render_template('login.html', error='An unexpected error occurred during login.')
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    session.pop('logged_in', None)
+    session.pop('username', None)
+    session.pop('cust_no', None)
+    session.pop('user_role', None)
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('login'))
+
+# Placeholder for a simple login_required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session or not session['logged_in']:
+            flash('Please log in to access this page.', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Placeholder for roles_required decorator
+from functools import wraps
+
+def roles_required(*roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'user_role' not in session or session['user_role'] not in roles:
+                flash('You do not have permission to access this page.', 'danger')
+                return redirect(url_for('home')) # Redirect to a generic home or error page
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+
+# --- Admin Dashboard ---
+@app.route('/admin_dashboard')
+@login_required
+@roles_required('Admin')
+def admin_dashboard_page():
+    conn = None
+    cursor = None
+    customers = []
+    try:
+        conn = get_db_connection()
+        if not conn:
+            flash('Database connection failed.', 'danger')
+            return render_template('admin_dashboard.html', customers=[])
+
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cursor.execute("SELECT cust_no, custname, email_address, contact_no, registration_status FROM customer ORDER BY custname;")
+        customers = cursor.fetchall()
+    except psycopg2.Error as err:
+        print(f"Database error fetching customers: {err}")
+        flash(f'Error loading customers: {err}', 'danger')
+    except Exception as e:
+        print(f"Error: {e}")
+        flash('An unexpected error occurred.', 'danger')
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+    return render_template('admin_dashboard.html', customers=customers)
+
+
+@app.route('/admin/customer/<uuid:cust_no>')
+@login_required
+@roles_required('Admin')
+def admin_customer_details(cust_no):
+    conn = None
+    cursor = None
+    customer = {}
+    try:
+        conn = get_db_connection()
+        if not conn:
+            flash('Database connection failed.', 'danger')
+            return redirect(url_for('admin_dashboard_page'))
+
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        # Fetch all related details using LEFT JOINs
+        cursor.execute("""
+            SELECT
+                c.cust_no, c.custname, c.datebirth, c.nationality, c.citizenship, c.custsex, c.placebirth,
+                c.civilstatus, c.num_children, c.mmaiden_name, c.cust_address, c.email_address,
+                c.contact_no, c.registration_status,
+                o.occ_type, o.bus_nature,
+                f.source_wealth, f.mon_income, f.ann_income,
+                e.tin_id, e.empname, e.emp_address, e.phonefax_no, e.job_title, e.emp_date,
+                s.sp_name, s.sp_datebirth, s.sp_profession,
+                comp.depositor_role, comp.dep_compname,
+                eb.bank_code, eb.acc_type,
+                po.gov_int_name, po.official_position, po.branch_orgname,
+                cpr.relation_desc
+            FROM customer c
+            LEFT JOIN occupation o ON c.occ_id = o.occ_id
+            LEFT JOIN financial_record f ON c.fin_code = f.fin_code
+            LEFT JOIN employment_details emd ON c.cust_no = emd.cust_no
+            LEFT JOIN employer_details e ON emd.emp_id = e.emp_id
+            LEFT JOIN spouse s ON c.cust_no = s.cust_no
+            LEFT JOIN company_affiliation comp ON c.cust_no = comp.cust_no
+            LEFT JOIN existing_bank eb ON c.cust_no = eb.cust_no
+            LEFT JOIN cust_po_relationship cpr ON c.cust_no = cpr.cust_no
+            LEFT JOIN public_official_details po ON cpr.gov_int_id = po.gov_int_id
+            WHERE c.cust_no = %s;
+        """, (str(cust_no),))
+        
+        customer = cursor.fetchone()
+
+        if not customer:
+            flash('Customer not found.', 'danger')
+            return redirect(url_for('admin_dashboard_page'))
+        
+        # Format dates for display
+        if customer.get('datebirth'):
+            customer['datebirth_formatted'] = customer['datebirth'].strftime('%Y-%m-%d')
+        if customer.get('emp_date'):
+            customer['emp_date_formatted'] = customer['emp_date'].strftime('%Y-%m-%d')
+        if customer.get('sp_datebirth'):
+            customer['sp_datebirth_formatted'] = customer['sp_datebirth'].strftime('%Y-%m-%d')
+
+    except psycopg2.Error as err:
+        print(f"Database error fetching customer details: {err}")
+        flash(f'An error occurred: {err}', 'danger')
+        return redirect(url_for('admin_dashboard_page'))
+    except Exception as e:
+        print(f"Error fetching customer details: {e}")
+        flash('An unexpected error occurred.', 'danger')
+        return redirect(url_for('admin_dashboard_page'))
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+    return render_template('admin_customer_details.html', customer=customer)
+
+
+@app.route('/admin/add_customer', methods=['GET', 'POST'])
+@login_required
+@roles_required('Admin')
+def admin_add_customer():
+    conn = None
+    cursor = None
+    if request.method == 'POST':
+        try:
+            # Collect data from form
+            first_name = request.form.get('firstName')
+            last_name = request.form.get('lastName')
+            custname = f"{first_name} {last_name}".strip() if first_name and last_name else request.form.get('custname')
+            if not custname: # Fallback if combination is empty or not provided
+                custname = request.form.get('custname', 'N/A') # Ensure it's never empty
+
+            datebirth = request.form.get('dob')
+            nationality = request.form.get('nationality')
+            citizenship = request.form.get('citizenship')
+            custsex = request.form.get('sex')
+            placebirth = request.form.get('placeOfBirth')
+            civilstatus = request.form.get('civilStatus')
+            num_children = int(request.form.get('children', 0) or 0)
+            mmaiden_name = request.form.get('motherMaidenName')
+            cust_address = request.form.get('address')
+            email_address = request.form.get('email')
+            contact_no = request.form.get('telephone')
+            registration_status = request.form.get('registrationStatus', 'Pending') # Default to Pending
+
+            # Occupation details
+            occ_type = request.form.get('occupation')
+            bus_nature = request.form.get('natureOfBusiness')
+
+            # Financial details
+            source_wealth_list = request.form.getlist('sourceOfWealth')
+            source_wealth = ', '.join(source_wealth_list) if isinstance(source_wealth_list, list) else request.form.get('sourceOfWealth', '')
+            mon_income = request.form.get('monthlyIncome')
+            ann_income = request.form.get('annualIncome')
+
+            conn = get_db_connection()
+            if not conn:
+                flash('Database connection failed.', 'danger')
+                return redirect(url_for('admin_add_customer'))
+
+            cursor = conn.cursor()
+            conn.autocommit = False # Start a transaction
+
+            occ_id = None
+            if occ_type or bus_nature:
+                cursor.execute("INSERT INTO occupation (occ_type, bus_nature) VALUES (%s, %s) RETURNING occ_id;",
+                               (occ_type, bus_nature))
+                occ_id_row = cursor.fetchone()
+                if occ_id_row:
+                    occ_id = occ_id_row[0]
+                else:
+                    flash('Failed to create occupation record.', 'warning')
+
+
+            fin_code = None
+            if source_wealth or mon_income or ann_income:
+                cursor.execute("INSERT INTO financial_record (source_wealth, mon_income, ann_income) VALUES (%s, %s, %s) RETURNING fin_code;",
+                               (source_wealth, mon_income, ann_income))
+                fin_code_row = cursor.fetchone()
+                if fin_code_row:
+                    fin_code = fin_code_row[0]
+                else:
+                    flash('Failed to create financial record.', 'warning')
+
+
+            # Insert into customer table
+            sql_cust = """INSERT INTO customer (custname, datebirth, nationality, citizenship, custsex, placebirth, civilstatus, num_children, mmaiden_name, cust_address, email_address, contact_no, occ_id, fin_code, registration_status)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cust_no;"""
+            customer_data = (
+                custname, datebirth, nationality, citizenship, custsex,
+                placebirth, civilstatus, num_children, mmaiden_name,
+                cust_address, email_address, contact_no, occ_id, fin_code, registration_status
+            )
+            cursor.execute(sql_cust, customer_data)
+            cust_no = cursor.fetchone()[0] # Get the newly generated cust_no
+
+            # Employer details if applicable
+            if occ_type == 'Employed' and occ_id:
+                tin_id = request.form.get('tinId', '')
+                empname = request.form.get('companyName', '')
+                emp_address = request.form.get('employerAddress', '')
+                phonefax_no = request.form.get('employerPhone', '')
+                emp_date_str = request.form.get('employmentDate')
+                emp_date = emp_date_str if emp_date_str else None
+                job_title = request.form.get('jobTitle', '')
+
+                cursor.execute("""
+                    INSERT INTO employer_details (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING emp_id;
+                """, (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
+                emp_id_row = cursor.fetchone()
+                if emp_id_row:
+                    emp_id = emp_id_row[0]
+                    cursor.execute("INSERT INTO employment_details (cust_no, emp_id) VALUES (%s, %s);",
+                                   (cust_no, emp_id))
+                else:
+                    flash('Failed to create employer details record.', 'warning')
+
+
+            # Spouse details if married
+            if civilstatus == 'Married':
+                sp_name = f"{request.form.get('spouseFirstName', '')} {request.form.get('spouseLastName', '')}".strip()
+                sp_datebirth_str = request.form.get('spouseDob')
+                sp_datebirth = sp_datebirth_str if sp_datebirth_str else None
+                sp_profession = request.form.get('spouseProfession', '')
+
+                if sp_name or sp_datebirth or sp_profession:
+                    cursor.execute("""
+                        INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession)
+                        VALUES (%s, %s, %s, %s);
+                    """, (cust_no, sp_name, sp_datebirth, sp_profession))
+
+            # Company affiliation
+            depositor_role = request.form.get('depositorRole')
+            dep_compname = request.form.get('companyNameAffiliation')
+            if depositor_role or dep_compname:
+                cursor.execute("""
+                    INSERT INTO company_affiliation (cust_no, depositor_role, dep_compname)
+                    VALUES (%s, %s, %s);
+                """, (cust_no, depositor_role, dep_compname))
+
+            # Existing bank details
+            bank_code = request.form.get('bankCode')
+            acc_type = request.form.get('accountType')
+            if bank_code and acc_type:
+                # Basic check if bank_code exists in bank_details (foreign key constraint will also catch)
+                cursor.execute("SELECT bank_name FROM bank_details WHERE bank_code = %s;", (bank_code,))
+                if cursor.fetchone():
+                    cursor.execute("""
+                        INSERT INTO existing_bank (cust_no, bank_code, acc_type)
+                        VALUES (%s, %s, %s);
+                    """, (cust_no, bank_code, acc_type))
+                else:
+                    flash(f'Bank Code {bank_code} does not exist. Please add it first.', 'danger')
+
+            # Public Official relationship
+            gov_int_name = request.form.get('governmentOfficialName')
+            official_position = request.form.get('officialPosition')
+            branch_orgname = request.form.get('branchOrgName')
+            relation_desc = request.form.get('relationshipNature')
+
+            if gov_int_name or official_position or branch_orgname or relation_desc:
+                gov_int_id = None
+                cursor.execute("SELECT gov_int_id FROM public_official_details WHERE gov_int_name = %s AND official_position = %s;",
+                               (gov_int_name, official_position))
+                existing_gov_int = cursor.fetchone()
+                if existing_gov_int:
+                    gov_int_id = existing_gov_int[0]
+                else:
+                    cursor.execute("""
+                        INSERT INTO public_official_details (gov_int_name, official_position, branch_orgname)
+                        VALUES (%s, %s, %s) RETURNING gov_int_id;
+                    """, (gov_int_name, official_position, branch_orgname))
+                    gov_int_id_row = cursor.fetchone()
+                    if gov_int_id_row:
+                        gov_int_id = gov_int_id_row[0]
+                    else:
+                        flash('Failed to create public official details record.', 'warning')
+                
+                if gov_int_id:
+                    cursor.execute("""
+                        INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc)
+                        VALUES (%s, %s, %s);
+                    """, (cust_no, gov_int_id, relation_desc))
+
+
+            conn.commit()
+            flash(f'Customer {cust_no} added successfully!', 'success')
+            return redirect(url_for('admin_dashboard_page'))
+
+        except psycopg2.IntegrityError as err:
+            conn.rollback()
+            print(f"Database Integrity Error during customer addition: {err}")
+            if "customer_email_address_key" in str(err):
+                flash('Email address already exists for another customer.', 'danger')
+            else:
+                flash(f'A database integrity error occurred: {err}', 'danger')
+            if debug_mode:
+                raise
+            return redirect(url_for('admin_add_customer'))
+        except psycopg2.Error as err:
+            conn.rollback()
+            print(f"Database error during customer addition: {err}")
+            if debug_mode:
+                raise
+            flash(f'An error occurred: {err}', 'danger')
+            return redirect(url_for('admin_add_customer'))
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            print(f"Error during customer addition: {e}")
+            if debug_mode:
+                raise
+            flash('An unexpected error occurred during customer addition.', 'danger')
+            return redirect(url_for('admin_add_customer'))
         finally:
             if cursor:
                 cursor.close()
             if conn:
                 conn.close()
 
-    return render_template('login.html')
+    return render_template('admin_add_customer.html')
 
-@app.route('/registrationSuccess')
-def registration_success():
-    """Renders the registration success page."""
-    return render_template('registrationSuccess.html')
 
-# Explicitly named endpoint for clarity and to resolve potential routing issues
-@app.route('/admin_dashboard', endpoint='admin_dashboard_page')
-def admin_dashboard():
-    if 'admin' not in session:
-        flash('Please login to access the admin dashboard.', 'warning')
-        return redirect(url_for('login')) 
-
-    conn = None
-    cursor = None
-    try:
-        conn = get_db_connection()
-        if not conn:
-            if debug_mode:
-                raise Exception("Database connection failed for admin_dashboard.")
-            flash('Database connection failed.', 'danger')
-            return redirect(url_for('login'))
-
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        
-        # Get query parameters for filtering and searching
-        search_query = request.args.get('search', '').strip()
-        status_filter = request.args.get('status', '').strip()
-        reg_date_filter = request.args.get('reg_date', '').strip()
-
-        sql_query = """
-            SELECT c.cust_no, c.custname, c.email_address, c.contact_no, 
-                   c.registration_status, 
-                   c.datebirth AS registration_date -- Using datebirth as registration date
-            FROM customer c
-            WHERE 1=1
-        """
-        params = []
-
-        if search_query:
-            sql_query += " AND (c.custname ILIKE %s OR c.email_address ILIKE %s OR c.contact_no ILIKE %s)"
-            params.extend([f"%{search_query}%", f"%{search_query}%", f"%{search_query}%"])
-        
-        if status_filter and status_filter != 'All Statuses':
-            sql_query += " AND c.registration_status = %s"
-            params.append(status_filter)
-
-        if reg_date_filter:
-            sql_query += " AND c.datebirth = %s" 
-            params.append(reg_date_filter)
-
-        sql_query += " ORDER BY c.custname ASC" 
-
-        cursor.execute(sql_query, params)
-        customers = cursor.fetchall()
-
-        # Convert UUID objects to strings for display in HTML template
-        # And ensure 'status' key for consistency in rendering badges
-        processed_customers = []
-        for customer in customers:
-            customer_dict = dict(customer) # Convert row to dictionary for modification
-            customer_dict['cust_no'] = str(customer_dict['cust_no'])
-            customer_dict['status'] = customer_dict.get('registration_status', 'Pending') 
-            if customer_dict.get('registration_date'):
-                customer_dict['registration_date'] = customer_dict['registration_date'].strftime('%Y-%m-%d')
-            processed_customers.append(customer_dict)
-
-        return render_template('admin_dashboard.html', customers=processed_customers)
-
-    except psycopg2.Error as err:
-        print(f"Database error in admin_dashboard: {err}")
-        if debug_mode:
-            raise
-        flash(f'An error occurred while loading the dashboard: {err}', 'danger')
-        return redirect(url_for('login')) 
-    except Exception as e:
-        print(f"Error in admin_dashboard: {e}")
-        if debug_mode:
-            raise
-        flash('An unexpected error occurred while loading the dashboard.', 'danger')
-        return redirect(url_for('login')) 
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-# --- NEW ROUTE: Admin Add Customer ---
-@app.route('/admin/add_customer', methods=['POST'])
-def admin_add_customer():
-    if 'admin' not in session:
-        flash('Please login to access this function.', 'warning')
-        return redirect(url_for('login'))
-
+@app.route('/admin/edit_customer/<uuid:cust_no>', methods=['GET', 'POST'])
+# @login_required # Assuming you have a login_required decorator
+# @roles_required('Admin') # Assuming roles_required decorator
+def admin_edit_customer(cust_no):
     conn = None
     cursor = None
     try:
@@ -762,550 +895,499 @@ def admin_add_customer():
         cursor = conn.cursor()
         conn.autocommit = False # Start a transaction
 
-        # --- Extract form data for Customer table ---
-        custname = request.form.get('custname')
-        datebirth = request.form.get('datebirth') or None # Handle empty date
-        nationality = request.form.get('nationality')
-        citizenship = request.form.get('citizenship')
-        custsex = request.form.get('custsex')
-        placebirth = request.form.get('placebirth')
-        civilstatus = request.form.get('civilstatus')
-        num_children = int(request.form.get('num_children') or 0)
-        mmaiden_name = request.form.get('mmaiden_name')
-        cust_address = request.form.get('cust_address')
-        email_address = request.form.get('email_address')
-        contact_no = request.form.get('contact_no')
-        registration_status = 'Active' 
-
-        # --- Insert into Financial Record table ---
-        source_wealth = request.form.get('source_wealth') or 'Unspecified'
-        mon_income = request.form.get('mon_income') or '0'
-        ann_income = request.form.get('ann_income') or '0'
-        sql_fin = "INSERT INTO financial_record (source_wealth, mon_income, ann_income) VALUES (%s, %s, %s) RETURNING fin_code;"
-        cursor.execute(sql_fin, (source_wealth, mon_income, ann_income))
-        fin_code = cursor.fetchone()[0]
-
-        # --- Insert into Occupation table ---
-        occ_type = request.form.get('occ_type') or 'Unspecified'
-        bus_nature = request.form.get('bus_nature') or 'General'
-        sql_occ = "INSERT INTO occupation (occ_type, bus_nature) VALUES (%s, %s) RETURNING occ_id;"
-        cursor.execute(sql_occ, (occ_type, bus_nature))
-        occ_id = cursor.fetchone()[0]
-
-        # --- Insert into Customer table ---
-        sql_cust = """INSERT INTO customer (custname, datebirth, nationality, citizenship, custsex, placebirth, civilstatus, num_children, mmaiden_name, cust_address, email_address, contact_no, occ_id, fin_code, registration_status)
-                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cust_no;"""
-        customer_data = (
-            custname, datebirth, nationality, citizenship,
-            custsex, placebirth, civilstatus,
-            num_children,
-            mmaiden_name, cust_address,
-            email_address, contact_no, occ_id, fin_code, registration_status
-        )
-        cursor.execute(sql_cust, customer_data)
-        cust_no = cursor.fetchone()[0] 
-
-        # --- Insert into Credentials table (using email as username, generate a simple password) ---
-        insert_credentials(cursor, cust_no, {'email': email_address}) 
-
-        # --- Insert into Spouse table (if married and data provided) ---
-        sp_name = request.form.get('sp_name')
-        sp_datebirth = request.form.get('sp_datebirth') or None # Handle empty date
-        sp_profession = request.form.get('sp_profession')
-        if civilstatus == 'Married' and sp_name and sp_profession and sp_datebirth:
-            sql_spouse = "INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession) VALUES (%s, %s, %s, %s);"
-            cursor.execute(sql_spouse, (str(cust_no), sp_name, sp_datebirth, sp_profession))
-
-        # --- Insert into Employer Details and Employment Details if applicable ---
-        if occ_type == 'Employed': 
-            tin_id = request.form.get('tin_id')
-            empname = request.form.get('empname')
-            emp_address = request.form.get('emp_address')
-            phonefax_no = request.form.get('phonefax_no')
-            job_title = request.form.get('job_title')
-            emp_date = request.form.get('emp_date') or None # Handle empty date
-
-            if empname: 
-                sql_emp_details = "INSERT INTO employer_details (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING emp_id;"
-                cursor.execute(sql_emp_details, (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
-                emp_id = cursor.fetchone()[0]
-                sql_emp_link = "INSERT INTO employment_details (cust_no, emp_id) VALUES (%s, %s);"
-                cursor.execute(sql_emp_link, (str(cust_no), emp_id))
-
-        conn.commit()
-        flash('Customer added successfully!', 'success')
-        return redirect(url_for('admin_dashboard_page'))
-
-    except psycopg2.Error as err:
-        if conn:
-            conn.rollback()
-        print(f"Database error during add customer: {err}")
-        flash(f'An error occurred during adding customer: {err}', 'danger')
-        return redirect(url_for('admin_dashboard_page'))
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        print(f"Unexpected error during add customer: {e}")
-        flash('An unexpected error occurred during adding customer.', 'danger')
-        return redirect(url_for('admin_dashboard_page'))
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-
-# --- ROUTE: Admin View Customer Details ---
-@app.route('/admin/customer/<uuid:cust_no>') 
-def admin_view_customer(cust_no):
-    if 'admin' not in session:
-        flash('Please login to access the admin dashboard.', 'warning')
-        return redirect(url_for('login'))
-
-    conn = None
-    cursor = None
-    user_data = {} 
-
-    try:
-        conn = get_db_connection()
-        if not conn:
-            if debug_mode:
-                raise Exception("Database connection failed for admin_view_customer.")
-            flash('Database connection failed.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) 
-
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
-        # Fetch Customer Information
-        cursor.execute("""
-            SELECT c.*, o.occ_type, o.bus_nature, f.source_wealth, f.mon_income, f.ann_income
-            FROM customer c
-            LEFT JOIN occupation o ON c.occ_id = o.occ_id
-            LEFT JOIN financial_record f ON c.fin_code = f.fin_code
-            WHERE c.cust_no = %s
-        """, (str(cust_no),)) 
-        user_data['customer'] = cursor.fetchone()
-
-        if not user_data['customer']:
-            flash(f'Customer with ID {cust_no} not found.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) 
-
-        user_data['occupation'] = {
-            'occ_type': user_data['customer'].get('occ_type'),
-            'bus_nature': user_data['customer'].get('bus_nature')
-        }
-        user_data['financial_record'] = {
-            'source_wealth': user_data['customer'].get('source_wealth'),
-            'mon_income': user_data['customer'].get('mon_income'),
-            'ann_income': user_data['customer'].get('ann_income')
-        }
-
-        # Fetch Spouse Information (if exists)
-        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (str(cust_no),)) 
-        user_data['spouse'] = cursor.fetchone()
-
-        # Fetch Employer Details (if exists, linked via employment_details and occupation)
-        if user_data['occupation']['occ_type'] == 'Employed':
-            cursor.execute("""
-                SELECT ed.*
-                FROM employer_details ed
-                JOIN employment_details empd ON ed.emp_id = empd.emp_id
-                WHERE empd.cust_no = %s
-            """, (str(cust_no),)) 
-            user_data['employer_details'] = cursor.fetchone()
-        else:
-            user_data['employer_details'] = None
-
-        # Fetch Company Affiliations
-        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (str(cust_no),)) 
-        user_data['company_affiliations'] = cursor.fetchall()
-
-        # Fetch Existing Bank Accounts
-        cursor.execute("""
-            SELECT eb.acc_type, bd.bank_name, bd.branch
-            FROM existing_bank eb
-            JOIN bank_details bd ON eb.bank_code = bd.bank_code
-            WHERE eb.cust_no = %s
-        """, (str(cust_no),)) 
-        user_data['existing_banks'] = cursor.fetchall()
-
-        # Fetch Public Official Relationships
-        cursor.execute("""
-            SELECT cpr.relation_desc, pod.gov_int_name, pod.official_position, pod.branch_orgname
-            FROM cust_po_relationship cpr
-            JOIN public_official_details pod ON cpr.gov_int_id = pod.gov_int_id
-            WHERE cpr.cust_no = %s
-        """, (str(cust_no),)) 
-        user_data['public_official_relationships'] = cursor.fetchall()
-
-        return render_template('admin_view_customer.html', user_data=user_data)
-
-    except psycopg2.Error as err:
-        print(f"Database error in admin_view_customer: {err}")
-        if debug_mode:
-            raise
-        flash(f'An error occurred while fetching customer data: {err}', 'danger')
-        return redirect(url_for('admin_dashboard_page')) 
-    except Exception as e:
-        print(f"Error in admin_view_customer: {e}")
-        if debug_mode:
-            raise
-        flash('An unexpected error occurred while loading customer details.', 'danger')
-        return redirect(url_for('admin_dashboard_page')) 
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-# --- NEW ROUTE: Admin Edit Customer Details ---
-@app.route('/admin/edit_customer/<uuid:cust_no>', methods=['GET', 'POST']) 
-def admin_edit_customer(cust_no):
-    if 'admin' not in session:
-        flash('Please login to access the admin dashboard.', 'warning')
-        return redirect(url_for('login'))
-
-    conn = None
-    cursor = None
-    customer_data = {} 
-
-    try:
-        conn = get_db_connection()
-        if not conn:
-            if debug_mode:
-                raise Exception("Database connection failed for admin_edit_customer.")
-            flash('Database connection failed.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) 
-
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
         if request.method == 'POST':
-            # --- Handle form submission for UPDATE ---
+            # Collect data from form
             first_name = request.form.get('firstName')
             last_name = request.form.get('lastName')
-            custname = f"{first_name} {last_name}" if first_name and last_name else request.form.get('custname') #
+            # Ensure custname is always set, combine first and last if available, else use existing/fallback
+            custname = f"{first_name} {last_name}".strip() if first_name and last_name else request.form.get('custname')
+            if not custname: # Fallback if combination is empty or not provided
+                custname = request.form.get('custname', 'N/A')
 
-            datebirth = request.form.get('datebirth') or None # Handle empty date string
+            datebirth = request.form.get('dob')
             nationality = request.form.get('nationality')
             citizenship = request.form.get('citizenship')
-            custsex = request.form.get('custsex')
-            placebirth = request.form.get('placebirth')
-            civilstatus = request.form.get('civilstatus')
-            num_children = request.form.get('num_children') or '0'
-            mmaiden_name = request.form.get('mmaiden_name')
-            cust_address = request.form.get('cust_address')
-            email_address = request.form.get('email_address')
-            contact_no = request.form.get('contact_no')
-            registration_status = request.form.get('registration_status') # Added this field from form
+            custsex = request.form.get('sex')
+            placebirth = request.form.get('placeOfBirth')
+            civilstatus = request.form.get('civilStatus')
+            num_children = int(request.form.get('children', 0) or 0)
+            mmaiden_name = request.form.get('motherMaidenName')
+            cust_address = request.form.get('address')
+            email_address = request.form.get('email')
+            contact_no = request.form.get('telephone')
+            registration_status = request.form.get('registrationStatus') # Get from form
 
-            sp_name = request.form.get('sp_name')
-            sp_datebirth = request.form.get('sp_datebirth') or None # Handle empty date string
-            sp_profession = request.form.get('sp_profession')
+            occ_type = request.form.get('occupation')
+            bus_nature = request.form.get('natureOfBusiness')
 
-            occ_type = request.form.get('occ_type')
-            bus_nature = request.form.get('bus_nature')
-            tin_id = request.form.get('tin_id')
-            empname = request.form.get('empname')
-            emp_address = request.form.get('emp_address')
-            phonefax_no = request.form.get('phonefax_no')
-            job_title = request.form.get('job_title')
-            emp_date = request.form.get('emp_date') or None # Handle empty date string
+            source_wealth_list = request.form.getlist('sourceOfWealth')
+            source_wealth = ', '.join(source_wealth_list) if isinstance(source_wealth_list, list) else request.form.get('sourceOfWealth', '')
+            mon_income = request.form.get('monthlyIncome')
+            ann_income = request.form.get('annualIncome')
 
-            source_wealth = request.form.get('source_wealth')
-            mon_income = request.form.get('mon_income')
-            ann_income = request.form.get('ann_income')
+            # Fetch current occ_id and fin_code from the customer record
+            cursor.execute("SELECT occ_id, fin_code FROM customer WHERE cust_no = %s;", (str(cust_no),))
+            current_customer_fk_info = cursor.fetchone()
+            
+            if not current_customer_fk_info:
+                flash(f'Customer with ID {cust_no} not found for update.', 'danger')
+                conn.rollback()
+                return redirect(url_for('admin_dashboard_page'))
 
-            conn.autocommit = False 
+            current_occ_id, current_fin_code = current_customer_fk_info
+
+            # --- Update Occupation Table (or insert if new) ---
+            occ_id_to_use = None
+            if current_occ_id:
+                # Try to update the existing occupation record
+                cursor.execute("""
+                    UPDATE occupation SET occ_type = %s, bus_nature = %s
+                    WHERE occ_id = %s RETURNING occ_id;
+                """, (occ_type, bus_nature, current_occ_id))
+                updated_occ_row = cursor.fetchone()
+                if updated_occ_row:
+                    occ_id_to_use = updated_occ_row[0]
+                else:
+                    # If update failed (occ_id from customer didn't exist in occupation table)
+                    # and new occupation data is provided, insert new.
+                    if occ_type or bus_nature:
+                        new_occ_id = uuid.uuid4() # Generate new UUID for new occupation
+                        cursor.execute("""
+                            INSERT INTO occupation (occ_id, occ_type, bus_nature) 
+                            VALUES (%s, %s, %s) RETURNING occ_id;
+                        """, (str(new_occ_id), occ_type, bus_nature))
+                        inserted_occ_row = cursor.fetchone()
+                        if inserted_occ_row:
+                            occ_id_to_use = inserted_occ_row[0]
+                            # Update customer to link to this new occupation
+                            cursor.execute("""
+                                UPDATE customer SET occ_id = %s WHERE cust_no = %s;
+                            """, (occ_id_to_use, str(cust_no)))
+                        else:
+                            flash('Failed to insert new occupation record after old one not found.', 'warning')
+                    else:
+                        # If no new occupation data and old occ_id was invalid, set customer's occ_id to NULL
+                        cursor.execute("""
+                            UPDATE customer SET occ_id = NULL WHERE cust_no = %s;
+                        """, (str(cust_no),))
+            elif occ_type or bus_nature: # If customer had no occ_id, or old one was invalid, and new data is provided
+                new_occ_id = uuid.uuid4() # Generate new UUID for new occupation
+                cursor.execute("""
+                    INSERT INTO occupation (occ_id, occ_type, bus_nature) 
+                    VALUES (%s, %s, %s) RETURNING occ_id;
+                """, (str(new_occ_id), occ_type, bus_nature))
+                inserted_occ_row = cursor.fetchone()
+                if inserted_occ_row:
+                    occ_id_to_use = inserted_occ_row[0]
+                    # Update customer to link to this new occupation
+                    cursor.execute("""
+                        UPDATE customer SET occ_id = %s WHERE cust_no = %s;
+                    """, (occ_id_to_use, str(cust_no)))
+                else:
+                    flash('Failed to insert new occupation record.', 'warning')
+            else: # No current occ_id, and no new occupation data provided
+                occ_id_to_use = None
+                # Ensure customer's occ_id is NULL if no occupation data
+                cursor.execute("""
+                    UPDATE customer SET occ_id = NULL WHERE cust_no = %s;
+                """, (str(cust_no),))
+            current_occ_id = occ_id_to_use # Update current_occ_id for subsequent use (e.g., employer details)
+
+
+            # --- Update Financial Record Table (or insert if new) ---
+            fin_code_to_use = None
+            if current_fin_code:
+                cursor.execute("""
+                    UPDATE financial_record SET source_wealth = %s, mon_income = %s, ann_income = %s
+                    WHERE fin_code = %s RETURNING fin_code;
+                """, (source_wealth, mon_income, ann_income, current_fin_code))
+                updated_fin_row = cursor.fetchone()
+                if updated_fin_row:
+                    fin_code_to_use = updated_fin_row[0]
+                else:
+                    # If update failed (fin_code from customer didn't exist in financial_record table)
+                    # and new financial data is provided, insert new.
+                    if source_wealth or mon_income or ann_income:
+                        new_fin_code = uuid.uuid4() # Generate new UUID for new financial record
+                        cursor.execute("""
+                            INSERT INTO financial_record (fin_code, source_wealth, mon_income, ann_income)
+                            VALUES (%s, %s, %s, %s) RETURNING fin_code;
+                        """, (str(new_fin_code), source_wealth, mon_income, ann_income))
+                        inserted_fin_row = cursor.fetchone()
+                        if inserted_fin_row:
+                            fin_code_to_use = inserted_fin_row[0]
+                            # Update customer to link to this new financial record
+                            cursor.execute("""
+                                UPDATE customer SET fin_code = %s WHERE cust_no = %s;
+                            """, (fin_code_to_use, str(cust_no)))
+                        else:
+                            flash('Failed to insert new financial record after old one not found.', 'warning')
+                    else:
+                        # If no new financial data and old fin_code was invalid, set customer's fin_code to NULL
+                        cursor.execute("""
+                            UPDATE customer SET fin_code = NULL WHERE cust_no = %s;
+                        """, (str(cust_no),))
+            elif source_wealth or mon_income or ann_income: # If customer had no fin_code, or old one was invalid, and new data is provided
+                new_fin_code = uuid.uuid4() # Generate new UUID for new financial record
+                cursor.execute("""
+                    INSERT INTO financial_record (fin_code, source_wealth, mon_income, ann_income)
+                    VALUES (%s, %s, %s, %s) RETURNING fin_code;
+                """, (str(new_fin_code), source_wealth, mon_income, ann_income))
+                inserted_fin_row = cursor.fetchone()
+                if inserted_fin_row:
+                    fin_code_to_use = inserted_fin_row[0]
+                    # Update customer to link to this new financial record
+                    cursor.execute("""
+                        UPDATE customer SET fin_code = %s WHERE cust_no = %s;
+                    """, (fin_code_to_use, str(cust_no)))
+                else:
+                    flash('Failed to insert new financial record.', 'warning')
+            else: # No current fin_code, and no new financial data provided
+                fin_code_to_use = None
+                # Ensure customer's fin_code is NULL if no financial data
+                cursor.execute("""
+                    UPDATE customer SET fin_code = NULL WHERE cust_no = %s;
+                """, (str(cust_no),))
+            current_fin_code = fin_code_to_use # Update current_fin_code for subsequent use if any
+
 
             # --- Update Customer Table ---
             cursor.execute("""
                 UPDATE customer
                 SET custname = %s, datebirth = %s, nationality = %s, citizenship = %s, custsex = %s,
                     placebirth = %s, civilstatus = %s, num_children = %s, mmaiden_name = %s,
-                    cust_address = %s, email_address = %s, contact_no = %s, registration_status = %s
-                WHERE cust_no = %s
-                RETURNING occ_id, fin_code;
+                    cust_address = %s, email_address = %s, contact_no = %s, registration_status = %s,
+                    occ_id = %s, fin_code = %s
+                WHERE cust_no = %s;
             """, (custname, datebirth, nationality, citizenship, custsex,
                   placebirth, civilstatus, int(num_children), mmaiden_name,
-                  cust_address, email_address, contact_no, registration_status, # Include registration_status
-                  str(cust_no))) 
+                  cust_address, email_address, contact_no, registration_status,
+                  current_occ_id, current_fin_code, # Use the potentially new/updated IDs
+                  str(cust_no)))
             
-            customer_ids_info = cursor.fetchone()
+            # --- Update Employer Details if applicable ---
+            # Only proceed if the occupation type is 'Employed' AND there's a valid occupation ID
+            if occ_type == 'Employed' and current_occ_id:
+                tin_id = request.form.get('tinId', '')
+                empname = request.form.get('companyName', '')
+                emp_address = request.form.get('employerAddress', '')
+                phonefax_no = request.form.get('employerPhone', '')
+                emp_date_str = request.form.get('employmentDate')
+                emp_date = emp_date_str if emp_date_str else None
+                job_title = request.form.get('jobTitle', '')
 
-            if not customer_ids_info:
-                flash(f'Customer with ID {cust_no} not found for update.', 'danger')
-                conn.rollback()
-                return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
+                # Check if an employer_details record already exists for this occ_id
+                cursor.execute("SELECT emp_id FROM employer_details WHERE occ_id = %s;", (current_occ_id,))
+                existing_emp_id_row = cursor.fetchone()
 
-            current_fin_code, current_occ_id = customer_ids_info 
-
-            # --- Update Occupation Table (or insert if new and not found) ---
-            if current_occ_id:
-                cursor.execute("""
-                    UPDATE occupation SET occ_type = %s, bus_nature = %s
-                    WHERE occ_id = %s RETURNING occ_id;
-                """, (occ_type, bus_nature, current_occ_id))
-                current_occ_id = cursor.fetchone()[0]  # Get the updated occ_id
-            else:  # If customer had no occupation, create one
-                if occ_type or bus_nature:
-                    cursor.execute("""
-                        INSERT INTO occupation (occ_type, bus_nature) 
-                        VALUES (%s, %s) RETURNING occ_id;
-                    """, (occ_type, bus_nature))
-                    current_occ_id = cursor.fetchone()[0]
-                    cursor.execute("""
-                        UPDATE customer SET occ_id = %s WHERE cust_no = %s;
-                    """, (current_occ_id, str(cust_no)))
-
-
-            # --- Update Financial Record Table ---
-            if current_fin_code:
-                cursor.execute("""
-                    UPDATE financial_record
-                    SET source_wealth = %s, mon_income = %s, ann_income = %s
-                    WHERE fin_code = %s;
-                """, (source_wealth, mon_income, ann_income, current_fin_code))
-            else: # If customer had no financial record, create one
-                if source_wealth or mon_income or ann_income:
-                    cursor.execute("INSERT INTO financial_record (source_wealth, mon_income, ann_income) VALUES (%s, %s, %s) RETURNING fin_code;", (source_wealth, mon_income, ann_income))
-                    new_fin_code = cursor.fetchone()[0]
-                    cursor.execute("UPDATE customer SET fin_code = %s WHERE cust_no = %s;", (new_fin_code, str(cust_no)))
-
-
-            # --- Update Spouse Table (Conditional insert/update/delete) ---
-            if civilstatus == 'Married' and sp_name and sp_datebirth and sp_profession:
-                cursor.execute("""
-                    INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession)
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (cust_no) DO UPDATE SET
-                        sp_name = EXCLUDED.sp_name,
-                        sp_datebirth = EXCLUDED.sp_datebirth,
-                        sp_profession = EXCLUDED.sp_profession;
-                """, (str(cust_no), sp_name, sp_datebirth, sp_profession)) 
-            else:
-                cursor.execute("DELETE FROM spouse WHERE cust_no = %s;", (str(cust_no),)) 
-
-            # --- Update Employer Details and Employment Details (Complex - simplified) ---
-            if occ_type == 'Employed' and empname:  # Only manage employer if occupation is 'Employed'
-                # First check if employer details already exist
-                cursor.execute("""
-                    SELECT ed.emp_id FROM employer_details ed
-                    JOIN employment_details empd ON ed.emp_id = empd.emp_id
-                    WHERE empd.cust_no = %s;
-                """, (str(cust_no),))
-                existing_emp_id_result = cursor.fetchone()
-                
-                if existing_emp_id_result:
+                emp_id_to_use = None
+                if existing_emp_id_row:
+                    emp_id = existing_emp_id_row[0]
                     # Update existing employer details
                     cursor.execute("""
-                        UPDATE employer_details
-                        SET occ_id = %s, tin_id = %s, empname = %s, 
-                            emp_address = %s, phonefax_no = %s, 
+                        UPDATE employer_details SET
+                            tin_id = %s, empname = %s, emp_address = %s, phonefax_no = %s,
                             job_title = %s, emp_date = %s
-                        WHERE emp_id = %s;
-                    """, (current_occ_id, tin_id, empname, emp_address, 
-                          phonefax_no, job_title, emp_date, existing_emp_id_result[0]))
-                else:
-                    # Insert new employer details
-                    cursor.execute("""
-                        INSERT INTO employer_details (
-                            occ_id, tin_id, empname, emp_address, 
-                            phonefax_no, job_title, emp_date
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s) 
-                        RETURNING emp_id;
-                    """, (current_occ_id, tin_id, empname, emp_address, 
-                          phonefax_no, job_title, emp_date))
-                    new_emp_id = cursor.fetchone()[0]
-                    
-                    # Link to employment_details
-                    cursor.execute("""
-                        INSERT INTO employment_details (cust_no, emp_id) 
-                        VALUES (%s, %s);
-                    """, (str(cust_no), new_emp_id))
-            else:
-                # Delete employment details if not employed
-                cursor.execute("""
-                    DELETE FROM employment_details 
-                    WHERE cust_no = %s;
-                """, (str(cust_no),))
-                # Also delete from employer_details if no other employment_details reference it
-                if current_occ_id: 
-                    cursor.execute("SELECT emp_id FROM employer_details WHERE occ_id = %s AND emp_id NOT IN (SELECT emp_id FROM employment_details);", (current_occ_id,))
-                    orphaned_emp_ids = cursor.fetchall()
-                    for emp_id_to_delete in orphaned_emp_ids:
-                        cursor.execute("DELETE FROM employer_details WHERE emp_id = %s;", (emp_id_to_delete[0],))
-
-
-            # --- Update Dynamic Lists: Company Affiliations, Existing Banks, Public Official Relationships ---
-            # Company Affiliations
-            cursor.execute("DELETE FROM company_affiliation WHERE cust_no = %s;", (str(cust_no),)) 
-            depositor_roles = request.form.getlist('depositor_role[]')
-            dep_compnames = request.form.getlist('dep_compname[]')
-            for role, comp_name in zip(depositor_roles, dep_compnames):
-                if role and comp_name: # Only insert if both fields are non-empty
-                    cursor.execute("INSERT INTO company_affiliation (cust_no, depositor_role, dep_compname) VALUES (%s, %s, %s);", (str(cust_no), role, comp_name)) 
-
-            # Existing Bank Accounts
-            cursor.execute("DELETE FROM existing_bank WHERE cust_no = %s;", (str(cust_no),)) 
-            bank_names = request.form.getlist('bank_name[]')
-            branches = request.form.getlist('branch[]')
-            acc_types = request.form.getlist('acc_type[]')
-            for b_name, branch, a_type in zip(bank_names, branches, acc_types):
-                if b_name and branch and a_type: # Only insert if all fields are non-empty
-                    cursor.execute("INSERT INTO bank_details (bank_code, bank_name, branch) VALUES (%s, %s, %s) ON CONFLICT (bank_code) DO NOTHING;", (b_name, b_name, branch))
-                    cursor.execute("INSERT INTO existing_bank (cust_no, bank_code, acc_type) VALUES (%s, %s, %s);", (str(cust_no), b_name, a_type)) 
-
-            # Public Official Relationships
-            cursor.execute("DELETE FROM cust_po_relationship WHERE cust_no = %s;", (str(cust_no),)) 
-            gov_int_names = request.form.getlist('gov_int_name[]')
-            official_positions = request.form.getlist('official_position[]')
-            branch_orgnames = request.form.getlist('branch_orgname[]')
-            relation_descs = request.form.getlist('relation_desc[]')
-
-            min_len_po = min(len(gov_int_names), len(official_positions), len(branch_orgnames), len(relation_descs))
-            for i in range(min_len_po):
-                gov_name = gov_int_names[i]
-                pos = official_positions[i]
-                org = branch_orgnames[i]
-                rel_desc = relation_descs[i]
-
-                if gov_name and pos and org and rel_desc: # Only insert if all fields are non-empty
-                    cursor.execute("SELECT gov_int_id FROM public_official_details WHERE gov_int_name = %s AND official_position = %s AND branch_orgname = %s;", (gov_name, pos, org))
-                    po_id_result = cursor.fetchone()
-                    if po_id_result:
-                        gov_int_id = po_id_result[0]
+                        WHERE emp_id = %s RETURNING emp_id;
+                    """, (tin_id, empname, emp_address, phonefax_no,
+                          job_title, emp_date, emp_id))
+                    updated_emp_row = cursor.fetchone()
+                    if updated_emp_row:
+                        emp_id_to_use = updated_emp_row[0]
                     else:
-                        cursor.execute("INSERT INTO public_official_details (gov_int_name, official_position, branch_orgname) VALUES (%s, %s, %s) RETURNING gov_int_id;", (gov_name, pos, org))
-                        gov_int_id = cursor.fetchone()[0]
-                    
-                    cursor.execute("INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc) VALUES (%s, %s, %s);", (str(cust_no), gov_int_id, rel_desc)) 
+                        flash('Failed to update existing employer details. Data inconsistency possible.', 'warning')
+                else:
+                    # Insert new employer details if not existing and current_occ_id is valid
+                    new_emp_id = uuid.uuid4()
+                    cursor.execute("""
+                        INSERT INTO employer_details (emp_id, occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING emp_id;
+                    """, (str(new_emp_id), current_occ_id, tin_id, empname, emp_address, phonefax_no,
+                          job_title, emp_date))
+                    inserted_emp_row = cursor.fetchone()
+                    if inserted_emp_row:
+                        emp_id_to_use = inserted_emp_row[0]
+                    else:
+                        flash('Failed to insert new employer details.', 'warning')
+
+                # Update employment_details (link customer to employer)
+                if emp_id_to_use:
+                    cursor.execute("SELECT COUNT(*) FROM employment_details WHERE cust_no = %s AND emp_id = %s;",
+                                   (str(cust_no), emp_id_to_use))
+                    if cursor.fetchone()[0] == 0:
+                        cursor.execute("INSERT INTO employment_details (cust_no, emp_id) VALUES (%s, %s);",
+                                       (str(cust_no), emp_id_to_use))
+            elif occ_type != 'Employed': # If occupation is no longer 'Employed', remove related employer details
+                # Remove links in employment_details
+                cursor.execute("DELETE FROM employment_details WHERE cust_no = %s;", (str(cust_no),))
+                # Remove employer_details if no other customer or no_occ_id points to it
+                if current_occ_id: # Only try to delete if there was an occ_id
+                    cursor.execute("""
+                        DELETE FROM employer_details WHERE occ_id = %s AND NOT EXISTS (
+                            SELECT 1 FROM employment_details WHERE emp_id = employer_details.emp_id
+                        );
+                    """, (current_occ_id,))
+
+
+            # --- Update Spouse Details if civil status is Married ---
+            if civilstatus == 'Married':
+                sp_name = f"{request.form.get('spouseFirstName', '')} {request.form.get('spouseLastName', '')}".strip()
+                sp_datebirth_str = request.form.get('spouseDob')
+                sp_datebirth = sp_datebirth_str if sp_datebirth_str else None
+                sp_profession = request.form.get('spouseProfession', '')
+
+                if sp_name or sp_datebirth or sp_profession: # Only update/insert if spouse data is provided
+                    # Check if spouse record already exists for this customer
+                    cursor.execute("SELECT cust_no FROM spouse WHERE cust_no = %s;", (str(cust_no),))
+                    existing_spouse = cursor.fetchone()
+
+                    if existing_spouse:
+                        cursor.execute("""
+                            UPDATE spouse SET sp_name = %s, sp_datebirth = %s, sp_profession = %s
+                            WHERE cust_no = %s;
+                        """, (sp_name, sp_datebirth, sp_profession, str(cust_no)))
+                    else:
+                        cursor.execute("""
+                            INSERT INTO spouse (cust_no, sp_name, sp_datebirth, sp_profession)
+                            VALUES (%s, %s, %s, %s);
+                        """, (str(cust_no), sp_name, sp_datebirth, sp_profession))
+                else: # Civil status is Married, but no spouse details provided, delete if exists
+                    cursor.execute("DELETE FROM spouse WHERE cust_no = %s;", (str(cust_no),))
+            else: # Civil status is not Married, delete spouse record if exists
+                cursor.execute("DELETE FROM spouse WHERE cust_no = %s;", (str(cust_no),))
+
+            # --- Update Company Affiliation ---
+            depositor_role = request.form.get('depositorRole')
+            dep_compname = request.form.get('companyNameAffiliation')
+
+            if depositor_role or dep_compname:
+                cursor.execute("SELECT COUNT(*) FROM company_affiliation WHERE cust_no = %s;", (str(cust_no),))
+                if cursor.fetchone()[0] > 0:
+                    cursor.execute("""
+                        UPDATE company_affiliation SET depositor_role = %s, dep_compname = %s
+                        WHERE cust_no = %s;
+                    """, (depositor_role, dep_compname, str(cust_no)))
+                else:
+                    cursor.execute("""
+                        INSERT INTO company_affiliation (cust_no, depositor_role, dep_compname)
+                        VALUES (%s, %s, %s);
+                    """, (str(cust_no), depositor_role, dep_compname))
+            else:
+                cursor.execute("DELETE FROM company_affiliation WHERE cust_no = %s;", (str(cust_no),))
+
+            # --- Update Existing Bank Details ---
+            bank_code = request.form.get('bankCode')
+            acc_type = request.form.get('accountType')
+
+            if bank_code and acc_type: # Bank code is a FK, must exist in bank_details
+                # First, ensure the bank_code exists in bank_details table
+                cursor.execute("SELECT bank_name FROM bank_details WHERE bank_code = %s;", (bank_code,))
+                if cursor.fetchone():
+                    cursor.execute("SELECT COUNT(*) FROM existing_bank WHERE cust_no = %s AND bank_code = %s;",
+                                   (str(cust_no), bank_code))
+                    if cursor.fetchone()[0] > 0:
+                        cursor.execute("""
+                            UPDATE existing_bank SET acc_type = %s
+                            WHERE cust_no = %s AND bank_code = %s;
+                        """, (acc_type, str(cust_no), bank_code))
+                    else:
+                        cursor.execute("""
+                            INSERT INTO existing_bank (cust_no, bank_code, acc_type)
+                            VALUES (%s, %s, %s);
+                        """, (str(cust_no), bank_code, acc_type))
+                else:
+                    flash('Invalid Bank Code. Please ensure the bank exists in the system.', 'danger')
+            else:
+                # If bank details are removed from form, delete them from DB
+                cursor.execute("DELETE FROM existing_bank WHERE cust_no = %s;", (str(cust_no),))
+
+            # --- Update Public Official Relationship ---
+            gov_int_name = request.form.get('governmentOfficialName')
+            official_position = request.form.get('officialPosition')
+            branch_orgname = request.form.get('branchOrgName')
+            relation_desc = request.form.get('relationshipNature')
+
+            if gov_int_name or official_position or branch_orgname or relation_desc:
+                # Check if public official detail exists or insert new
+                gov_int_id_to_use = None
+                cursor.execute("SELECT gov_int_id FROM public_official_details WHERE gov_int_name = %s AND official_position = %s;",
+                               (gov_int_name, official_position))
+                existing_gov_int = cursor.fetchone()
+
+                if existing_gov_int:
+                    gov_int_id_to_use = existing_gov_int[0]
+                else:
+                    new_gov_int_id = uuid.uuid4()
+                    cursor.execute("""
+                        INSERT INTO public_official_details (gov_int_id, gov_int_name, official_position, branch_orgname)
+                        VALUES (%s, %s, %s, %s) RETURNING gov_int_id;
+                    """, (str(new_gov_int_id), gov_int_name, official_position, branch_orgname))
+                    inserted_gov_int_row = cursor.fetchone()
+                    if inserted_gov_int_row:
+                        gov_int_id_to_use = inserted_gov_int_row[0]
+                    else:
+                        flash('Failed to insert new public official details.', 'warning')
+
+                if gov_int_id_to_use:
+                    # Update or insert cust_po_relationship
+                    cursor.execute("SELECT COUNT(*) FROM cust_po_relationship WHERE cust_no = %s AND gov_int_id = %s;",
+                                   (str(cust_no), gov_int_id_to_use))
+                    if cursor.fetchone()[0] > 0:
+                        cursor.execute("""
+                            UPDATE cust_po_relationship SET relation_desc = %s
+                            WHERE cust_no = %s AND gov_int_id = %s;
+                        """, (relation_desc, str(cust_no), gov_int_id_to_use))
+                    else:
+                        cursor.execute("""
+                            INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc)
+                            VALUES (%s, %s, %s);
+                        """, (str(cust_no), gov_int_id_to_use, relation_desc))
+            else:
+                # If no public official details, delete any existing relationship
+                cursor.execute("DELETE FROM cust_po_relationship WHERE cust_no = %s;", (str(cust_no),))
             
             conn.commit()
-            flash('Customer details updated successfully!', 'success')
-            return redirect(url_for('admin_view_customer', cust_no=cust_no))
-        
-        # --- Handle GET request (and fall-through from POST) for displaying current data ---
-        # Fetch Customer Information
-        cursor.execute("""
-            SELECT c.*, o.occ_type, o.bus_nature, f.source_wealth, f.mon_income, f.ann_income
-            FROM customer c
-            LEFT JOIN occupation o ON c.occ_id = o.occ_id
-            LEFT JOIN financial_record f ON c.fin_code = f.fin_code
-            WHERE c.cust_no = %s
-        """, (str(cust_no),)) 
-        customer_data['customer'] = cursor.fetchone()
+            flash(f'Customer {cust_no} updated successfully!', 'success')
+            return redirect(url_for('admin_dashboard_page'))
 
-        if not customer_data['customer']:
-            flash(f'Customer with ID {cust_no} not found.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) 
-
-        customer_data['occupation'] = {
-            'occ_type': customer_data['customer'].get('occ_type'),
-            'bus_nature': customer_data['customer'].get('bus_nature')
-        }
-        customer_data['financial_record'] = {
-            'source_wealth': customer_data['customer'].get('source_wealth'),
-            'mon_income': customer_data['customer'].get('mon_income'),
-            'ann_income': customer_data['customer'].get('ann_income')
-        }
-
-        # Fetch Spouse Information (if exists)
-        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (str(cust_no),)) 
-        customer_data['spouse'] = cursor.fetchone()
-
-        # Fetch Employer Details (if exists and occupation is 'Employed')
-        if customer_data['occupation']['occ_type'] == 'Employed':
+        else: # GET request: Populate form with existing data
             cursor.execute("""
-                SELECT ed.*
-                FROM employer_details ed
-                JOIN employment_details empd ON ed.emp_id = empd.emp_id
-                WHERE empd.cust_no = %s
-            """, (str(cust_no),)) 
-            customer_data['employer_details'] = cursor.fetchone()
-        else:
-            customer_data['employer_details'] = None
+                SELECT
+                    c.custname, c.datebirth, c.nationality, c.citizenship, c.custsex, c.placebirth,
+                    c.civilstatus, c.num_children, c.mmaiden_name, c.cust_address, c.email_address,
+                    c.contact_no, c.registration_status,
+                    o.occ_type, o.bus_nature,
+                    f.source_wealth, f.mon_income, f.ann_income,
+                    e.tin_id, e.empname, e.emp_address, e.phonefax_no, e.job_title, e.emp_date,
+                    s.sp_name, s.sp_datebirth, s.sp_profession,
+                    comp.depositor_role, comp.dep_compname,
+                    eb.bank_code, eb.acc_type,
+                    po.gov_int_name, po.official_position, po.branch_orgname,
+                    cpr.relation_desc
+                FROM customer c
+                LEFT JOIN occupation o ON c.occ_id = o.occ_id
+                LEFT JOIN financial_record f ON c.fin_code = f.fin_code
+                LEFT JOIN employment_details emd ON c.cust_no = emd.cust_no
+                LEFT JOIN employer_details e ON emd.emp_id = e.emp_id
+                LEFT JOIN spouse s ON c.cust_no = s.cust_no
+                LEFT JOIN company_affiliation comp ON c.cust_no = comp.cust_no
+                LEFT JOIN existing_bank eb ON c.cust_no = eb.cust_no
+                LEFT JOIN cust_po_relationship cpr ON c.cust_no = cpr.cust_no
+                LEFT JOIN public_official_details po ON cpr.gov_int_id = po.gov_int_id
+                WHERE c.cust_no = %s;
+            """, (str(cust_no),))
+            
+            customer_data = cursor.fetchone()
 
-        # Fetch Company Affiliations
-        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (str(cust_no),)) 
-        customer_data['company_affiliations'] = cursor.fetchall()
+            if not customer_data:
+                flash('Customer not found.', 'danger')
+                return redirect(url_for('admin_dashboard_page'))
 
-        # Fetch Existing Bank Accounts
-        cursor.execute("""
-            SELECT eb.acc_type, bd.bank_name, bd.branch
-            FROM existing_bank eb
-            JOIN bank_details bd ON eb.bank_code = bd.bank_code
-            WHERE eb.cust_no = %s
-        """, (str(cust_no),)) 
-        customer_data['existing_banks'] = cursor.fetchall()
+            # Convert row to dictionary for easier access in template
+            columns = [desc[0] for desc in cursor.description]
+            customer = dict(zip(columns, customer_data))
 
-        # Fetch Public Official Relationships
-        cursor.execute("""
-            SELECT cpr.relation_desc, pod.gov_int_name, pod.official_position, pod.branch_orgname
-            FROM cust_po_relationship cpr
-            JOIN public_official_details pod ON cpr.gov_int_id = pod.gov_int_id
-            WHERE cpr.cust_no = %s
-        """, (str(cust_no),)) 
-        customer_data['public_official_relationships'] = cursor.fetchall()
+            # Split custname into first and last for form
+            full_name = customer.get('custname', '').strip()
+            name_parts = full_name.rsplit(' ', 1)
+            customer['firstName'] = name_parts[0] if len(name_parts) > 1 else full_name
+            customer['lastName'] = name_parts[1] if len(name_parts) > 1 else ''
 
-        return render_template('admin_edit_customer.html', customer_data=customer_data)
+            # Split spouse name
+            spouse_full_name = customer.get('sp_name', '').strip()
+            spouse_name_parts = spouse_full_name.rsplit(' ', 1)
+            customer['spouseFirstName'] = spouse_name_parts[0] if len(spouse_name_parts) > 1 else spouse_full_name
+            customer['spouseLastName'] = spouse_name_parts[1] if len(spouse_name_parts) > 1 else ''
+
+            # Format dates for HTML input
+            if customer.get('datebirth'):
+                customer['datebirth'] = customer['datebirth'].isoformat()
+            if customer.get('emp_date'):
+                customer['emp_date'] = customer['emp_date'].isoformat()
+            if customer.get('sp_datebirth'):
+                customer['sp_datebirth'] = customer['sp_datebirth'].isoformat()
+            
+            # Convert source_wealth string back to list for checkboxes if needed, or handle in template
+            if customer.get('source_wealth'):
+                customer['sourceOfWealthList'] = [s.strip() for s in customer['source_wealth'].split(',')]
+            else:
+                customer['sourceOfWealthList'] = []
+
+            return render_template('admin_edit_customer.html', customer=customer, cust_no=str(cust_no))
 
     except psycopg2.Error as err:
-        print(f"Database error in admin_edit_customer: {err}")
+        conn.rollback()
+        print(f"Database error during customer edit: {err}")
         if debug_mode:
             raise
-        flash(f'An error occurred while fetching customer data: {err}', 'danger')
-        return redirect(url_for('admin_dashboard_page')) 
+        flash(f'An error occurred: {err}', 'danger')
+        return redirect(url_for('admin_dashboard_page'))
     except Exception as e:
-        print(f"Error in admin_edit_customer: {e}")
+        if conn:
+            conn.rollback()
+        print(f"Error during customer edit: {e}")
         if debug_mode:
             raise
-        flash('An unexpected error occurred while loading customer details for editing.', 'danger')
-        return redirect(url_for('admin_dashboard_page')) 
+        flash('An unexpected error occurred during customer edit.', 'danger')
+        return redirect(url_for('admin_dashboard_page'))
     finally:
         if cursor:
             cursor.close()
         if conn:
             conn.close()
 
-# --- NEW ROUTE: Delete Customer ---
-@app.route('/delete_customer', methods=['POST'])
-def delete_customer():
-    if 'admin' not in session:
-        flash('Please login to access this function.', 'warning')
-        return redirect(url_for('login'))
+# --- Customer Dashboard ---
+@app.route('/customer_dashboard')
+@login_required
+@roles_required('Customer') # Only accessible by regular customers
+def customer_dashboard_page():
+    # Placeholder for customer-specific data display or actions
+    return render_template('customer_dashboard.html', username=session.get('username'))
 
-    cust_no = request.form.get('cust_no')
-    if not cust_no:
-        flash('Customer ID is missing for deletion.', 'danger')
-        return redirect(url_for('admin_dashboard_page')) 
-
+@app.route('/delete_customer/<uuid:cust_no>', methods=['POST'])
+@login_required
+@roles_required('Admin')
+def delete_customer(cust_no):
     conn = None
     cursor = None
     try:
         conn = get_db_connection()
         if not conn:
-            if debug_mode:
-                raise Exception("Database connection failed for delete_customer.")
             flash('Database connection failed.', 'danger')
-            return redirect(url_for('admin_dashboard_page')) 
-
-        cursor = conn.cursor()
-        conn.autocommit = False 
-
-        # 1. Get occ_id and fin_code before deleting the customer
-        cursor.execute("SELECT fin_code, occ_id FROM customer WHERE cust_no = %s", (str(cust_no),)) 
-        customer_info = cursor.fetchone()
-        
-        if not customer_info: # If customer not found, nothing to delete
-            flash(f'Customer {cust_no} not found for deletion.', 'warning')
-            conn.rollback() # Rollback any implicit changes if necessary
             return redirect(url_for('admin_dashboard_page'))
 
-        fin_code, occ_id = customer_info 
+        cursor = conn.cursor()
+        conn.autocommit = False # Start a transaction for deletion
 
-        cursor.execute("DELETE FROM customer WHERE cust_no = %s", (str(cust_no),)) 
-        
-        # 3. Handle deletion of financial_record and occupation if they are no longer referenced
+        # Get related IDs before deleting the customer
+        cursor.execute("SELECT occ_id, fin_code FROM customer WHERE cust_no = %s;", (str(cust_no),))
+        customer_fks = cursor.fetchone()
+
+        occ_id = None
+        fin_code = None
+        if customer_fks:
+            occ_id = customer_fks[0]
+            fin_code = customer_fks[1]
+
+        # Delete from tables that have foreign keys referencing customer (ON DELETE CASCADE will handle many)
+        # For tables with ON DELETE SET NULL, no explicit deletion is needed here,
+        # but if we want to clean up orphaned records in occ and fin, we do it after customer deletion.
+
+        # Delete related employer details if this customer is the only one linked to its occupation
+        if occ_id:
+            cursor.execute("SELECT emp_id FROM employer_details WHERE occ_id = %s;", (occ_id,))
+            employer_ids = cursor.fetchall() # Get all employer_ids linked to this occ_id
+            
+            for emp_id_tuple in employer_ids:
+                emp_id = emp_id_tuple[0]
+                cursor.execute("SELECT COUNT(*) FROM employment_details WHERE emp_id = %s;", (emp_id,))
+                if cursor.fetchone()[0] == 1: # If this is the only customer linked to this employer_id
+                    cursor.execute("DELETE FROM employer_details WHERE emp_id = %s;", (emp_id,))
+            
+        # Delete the customer record (this should cascade delete credentials, spouse, company_affiliation, existing_bank, cust_po_relationship, employment_details)
+        cursor.execute("DELETE FROM customer WHERE cust_no = %s;", (str(cust_no),))
+
+        # After customer deletion, check if occ_id and fin_code are still referenced by any other customer
         if fin_code:
             cursor.execute("SELECT COUNT(*) FROM customer WHERE fin_code = %s", (fin_code,))
             if cursor.fetchone()[0] == 0: 
@@ -1345,5 +1427,5 @@ def delete_customer():
 # --- Main execution block ---
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000)) 
-    _ensure_database_schema() 
-    app.run(host='0.0.0.0', port=port, debug=debug_mode)
+    _ensure_database_schema() # Ensure schema on startup
+    app.run(debug=debug_mode, host='0.0.0.0', port=port) # Use 0.0.0.0 for Render deployment
