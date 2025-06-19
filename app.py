@@ -981,7 +981,10 @@ def admin_edit_customer(cust_no):
 
         if request.method == 'POST':
             # --- Handle form submission for UPDATE ---
-            custname = request.form.get('custname')
+            first_name = request.form.get('firstName')
+            last_name = request.form.get('lastName')
+            custname = f"{first_name} {last_name}" if first_name and last_name else request.form.get('custname') #
+
             datebirth = request.form.get('datebirth') or None # Handle empty date string
             nationality = request.form.get('nationality')
             citizenship = request.form.get('citizenship')
@@ -1034,19 +1037,25 @@ def admin_edit_customer(cust_no):
                 conn.rollback()
                 return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
 
-            current_fin_code, current_occ_id = customer_ids_info # Correct order as per RETURNING clause
+            current_fin_code, current_occ_id = customer_ids_info 
 
             # --- Update Occupation Table (or insert if new and not found) ---
             if current_occ_id:
                 cursor.execute("""
                     UPDATE occupation SET occ_type = %s, bus_nature = %s
-                    WHERE occ_id = %s;
+                    WHERE occ_id = %s RETURNING occ_id;
                 """, (occ_type, bus_nature, current_occ_id))
-            else: # If customer had no occupation, create one
+                current_occ_id = cursor.fetchone()[0]  # Get the updated occ_id
+            else:  # If customer had no occupation, create one
                 if occ_type or bus_nature:
-                    cursor.execute("INSERT INTO occupation (occ_type, bus_nature) VALUES (%s, %s) RETURNING occ_id;", (occ_type, bus_nature))
-                    new_occ_id = cursor.fetchone()[0]
-                    cursor.execute("UPDATE customer SET occ_id = %s WHERE cust_no = %s;", (new_occ_id, str(cust_no)))
+                    cursor.execute("""
+                        INSERT INTO occupation (occ_type, bus_nature) 
+                        VALUES (%s, %s) RETURNING occ_id;
+                    """, (occ_type, bus_nature))
+                    current_occ_id = cursor.fetchone()[0]
+                    cursor.execute("""
+                        UPDATE customer SET occ_id = %s WHERE cust_no = %s;
+                    """, (current_occ_id, str(cust_no)))
 
 
             # --- Update Financial Record Table ---
@@ -1077,26 +1086,50 @@ def admin_edit_customer(cust_no):
                 cursor.execute("DELETE FROM spouse WHERE cust_no = %s;", (str(cust_no),)) 
 
             # --- Update Employer Details and Employment Details (Complex - simplified) ---
-            if occ_type == 'Employed' and empname: # Only manage employer if occupation is 'Employed' and empname provided
-                cursor.execute("SELECT emp_id FROM employment_details WHERE cust_no = %s;", (str(cust_no),))
+            if occ_type == 'Employed' and empname:  # Only manage employer if occupation is 'Employed'
+                # First check if employer details already exist
+                cursor.execute("""
+                    SELECT ed.emp_id FROM employer_details ed
+                    JOIN employment_details empd ON ed.emp_id = empd.emp_id
+                    WHERE empd.cust_no = %s;
+                """, (str(cust_no),))
                 existing_emp_id_result = cursor.fetchone()
-                existing_emp_id = existing_emp_id_result[0] if existing_emp_id_result else None
-
-                if existing_emp_id:
+                
+                if existing_emp_id_result:
+                    # Update existing employer details
                     cursor.execute("""
                         UPDATE employer_details
-                        SET occ_id = %s, tin_id = %s, empname = %s, emp_address = %s, phonefax_no = %s, job_title = %s, emp_date = %s
+                        SET occ_id = %s, tin_id = %s, empname = %s, 
+                            emp_address = %s, phonefax_no = %s, 
+                            job_title = %s, emp_date = %s
                         WHERE emp_id = %s;
-                    """, (current_occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date, existing_emp_id))
-                else: # Insert new employer details if none existed for this customer
-                    sql_emp_details = "INSERT INTO employer_details (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING emp_id;"
-                    cursor.execute(sql_emp_details, (current_occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
+                    """, (current_occ_id, tin_id, empname, emp_address, 
+                          phonefax_no, job_title, emp_date, existing_emp_id_result[0]))
+                else:
+                    # Insert new employer details
+                    cursor.execute("""
+                        INSERT INTO employer_details (
+                            occ_id, tin_id, empname, emp_address, 
+                            phonefax_no, job_title, emp_date
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s) 
+                        RETURNING emp_id;
+                    """, (current_occ_id, tin_id, empname, emp_address, 
+                          phonefax_no, job_title, emp_date))
                     new_emp_id = cursor.fetchone()[0]
-                    cursor.execute("INSERT INTO employment_details (cust_no, emp_id) VALUES (%s, %s);", (str(cust_no), new_emp_id))
-            else: # If not employed or employer name is removed, delete employer details
-                cursor.execute("DELETE FROM employment_details WHERE cust_no = %s;", (str(cust_no),))
+                    
+                    # Link to employment_details
+                    cursor.execute("""
+                        INSERT INTO employment_details (cust_no, emp_id) 
+                        VALUES (%s, %s);
+                    """, (str(cust_no), new_emp_id))
+            else:
+                # Delete employment details if not employed
+                cursor.execute("""
+                    DELETE FROM employment_details 
+                    WHERE cust_no = %s;
+                """, (str(cust_no),))
                 # Also delete from employer_details if no other employment_details reference it
-                if current_occ_id: # Only attempt if there was an occ_id
+                if current_occ_id: 
                     cursor.execute("SELECT emp_id FROM employer_details WHERE occ_id = %s AND emp_id NOT IN (SELECT emp_id FROM employment_details);", (current_occ_id,))
                     orphaned_emp_ids = cursor.fetchall()
                     for emp_id_to_delete in orphaned_emp_ids:
