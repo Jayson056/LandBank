@@ -633,7 +633,9 @@ def userHome():
         if conn:
             conn.close()
 
-# --- NEW ROUTE: Admin Edit Customer Details ---
+
+
+   # --- NEW ROUTE: Admin Edit Customer Details ---
 @app.route('/admin/edit_customer/<uuid:cust_no>', methods=['GET', 'POST']) # Use <uuid:cust_no>
 def admin_edit_customer(cust_no):
     if 'admin' not in session:
@@ -642,7 +644,7 @@ def admin_edit_customer(cust_no):
 
     conn = None
     cursor = None
-    customer_data = {} # Will hold all fetched data for the customer
+    customer_data = {} 
 
     try:
         conn = get_db_connection()
@@ -653,14 +655,6 @@ def admin_edit_customer(cust_no):
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
         if request.method == 'POST':
-            # --- Handle form submission for UPDATE ---
-            # IMPORTANT: Implement your update logic here.
-            # This is a placeholder. You'll need to get form data and update
-            # all relevant tables (customer, spouse, financial_record, etc.)
-            # Example:
-            # new_custname = request.form.get('custname')
-            # cursor.execute("UPDATE customer SET custname = %s WHERE cust_no = %s", (new_custname, cust_no))
-            # conn.commit()
             flash('Customer update logic is not yet fully implemented for POST. Displaying current data.', 'info')
             return redirect(url_for('admin_view_customer', cust_no=cust_no))
         
@@ -765,12 +759,7 @@ def delete_customer():
             return redirect(url_for('admin_dashboard'))
 
         cursor = conn.cursor()
-        conn.autocommit = False # Start a transaction
-
-        # PostgreSQL handles CASCADE deletes via foreign key constraints,
-        # so explicit deletions from child tables are often not strictly needed
-        # if the foreign keys are set up with ON DELETE CASCADE.
-        # However, to explicitly handle related record deletion and orphaned records:
+        conn.autocommit = False 
 
         # 1. Get occ_id and fin_code before deleting the customer
         cursor.execute("SELECT fin_code, occ_id FROM customer WHERE cust_no = %s", (cust_no,))
@@ -778,24 +767,8 @@ def delete_customer():
         fin_code = customer_info[0] if customer_info else None
         occ_id = customer_info[1] if customer_info else None
 
-        # 2. Delete the customer record. This will trigger CASCADE deletes for:
-        #    - credentials
-        #    - cust_po_relationship
-        #    - existing_bank
-        #    - company_affiliation
-        #    - employment_details
-        #    - spouse
-        # if foreign keys are set up with ON DELETE CASCADE.
-        # You might still need to explicitly delete from employer_details,
-        # financial_record, and occupation if they are not exclusively linked
-        # or if their foreign keys are ON DELETE SET NULL.
         cursor.execute("DELETE FROM customer WHERE cust_no = %s", (cust_no,))
         
-        # 3. Handle employer_details (if it's not cascaded from employment_details, or if emp_id can become orphaned)
-        # Check if the emp_id is referenced by any other employment_details records *before* deleting customer.
-        # If not, and it was associated with this customer, delete it.
-        # This part assumes employer_details might not cascade from customer directly.
-        # Original code had logic for this, adapt for PostgreSQL:
         if fin_code:
             cursor.execute("SELECT COUNT(*) FROM customer WHERE fin_code = %s", (fin_code,))
             if cursor.fetchone()[0] == 0:
@@ -831,10 +804,10 @@ def delete_customer():
 # --- Main execution block ---
 if __name__ == '__main__':
     # For Render, the PORT will be provided by an environment variable
-    port = int(os.environ.get('PORT', 0000))
+    port = int(os.environ.get('PORT', 5000)) # Changed default port from 0000 to 5000
     # In a production environment, debug should be False
-    debug_mode = os.environ.get('FLASK_DEBUG', 'True') == 'True'
-
+    # debug_mode is already defined globally
+    
     _ensure_database_schema() # Run schema check/update on app startup
     app.run(host='0.0.0.0', port=port, debug=debug_mode)
 
