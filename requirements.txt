@@ -1,2 +1,3 @@
-Flask==2.3.3
-mysql-connector-python
+Flask==2.3.3 # Or your preferred Flask version, this is a stable one
+psycopg2-binary==2.9.9 # Use psycopg2-binary for easier installation on Render
+gunicorn==21.2.0 # Web server for deploymenta
