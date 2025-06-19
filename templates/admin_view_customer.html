@@ -29,240 +29,174 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: url('/static/assets/landbank-BG.png');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            z-index: -1; /* Behind content */
+            background: url('/static/assets/landbank-BG.png') no-repeat center center/cover;
+            z-index: -1;
         }
 
-        /* Main container for the form, adapted from .profile-form */
-        .customer-edit-container { /* Renamed for clarity for edit page */
-            background-color: rgba(255, 255, 255, 0.1); /* Slightly transparent white */
-            padding: 40px; /* Increased padding */
-            border-radius: 10px; /* Slightly less rounded than original profile-form */
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.3); /* Stronger shadow for contrast */
-            margin-top: 50px; /* Push down from the top */
+        .form-container {
+            background-color: rgba(255, 255, 255, 0.1); /* Semi-transparent white */
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+            width: 90%; /* Adjust width for responsiveness */
+            max-width: 800px; /* Max width for larger screens */
+            margin-top: 50px;
             margin-bottom: 50px;
-            max-width: 950px; /* Wider to accommodate content */
-            width: 100%;
-            box-sizing: border-box; /* Include padding in width */
-            border: 1px solid rgba(255, 255, 255, 0.2); /* Subtle white border */
-            position: relative;
-            z-index: 2;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        .customer-edit-container h2 {
-            color: #fff; /* White text for main title */
-            margin-bottom: 25px;
-            font-weight: bold;
+        @media (max-width: 768px) {
+            .form-container {
+                width: 95%;
+                padding: 1.5rem;
+                margin-top: 20px;
+                margin-bottom: 20px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .form-container {
+                padding: 1rem;
+                border-radius: 0; /* Remove border-radius on small screens */
+            }
+        }
+
+        h2 {
+            color: #fff;
             text-align: center;
+            margin-bottom: 30px;
+            font-weight: bold;
         }
 
-        .admin-edit-header { /* Renamed for clarity */
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 1.5px solid rgba(255, 255, 255, 0.5); /* Lighter border for contrast */
+        .section-title {
+            color: #90EE90; /* Light green for section titles */
+            font-weight: bold;
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 5px;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.3);
         }
-        .admin-edit-header h2 {
-            margin: 0;
-            font-size: 2em;
-            text-align: left;
-            color: #fff; /* White text */
-        }
-        .admin-edit-header .btn-group {
+
+        .form-group-custom, .list-group-item-custom {
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
-        }
-
-        /* Section titles */
-        .summary-section h3 {
-            color: #fff; /* White text for section titles */
-            font-size: 1.3em;
             margin-bottom: 15px;
-            border-bottom: 2px solid rgba(255, 255, 255, 0.3); /* Lighter border */
-            padding-bottom: 8px;
-            display: flex;
-            align-items: center;
-        }
-        .summary-section h3 i {
-            margin-right: 10px;
-            color: #90EE90; /* A lighter green for icons */
-        }
-        .summary-section {
-            background-color: rgba(255, 255, 255, 0.05); /* Very slight white background for sections */
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 25px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 0.05);
         }
 
-        /* Input fields and labels */
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* Adjusted min-width for more columns */
-            gap: 15px 25px;
+        .form-group-custom div, .list-group-item-custom div {
+            flex: 1 1 calc(33% - 20px); /* Three columns, adjusting for gap */
+            min-width: 150px; /* Minimum width before wrapping */
+            display: flex;
+            flex-direction: column; /* Stack label and input */
         }
-        .summary-item label {
-            font-weight: 600;
-            color: #fff; /* Changed from rgba to pure white */
-            display: block;
-            margin-bottom: 5px;
-        }
-        .summary-item input[type="text"],
-        .summary-item input[type="email"],
-        .summary-item input[type="tel"],
-        .summary-item input[type="number"],
-        .summary-item input[type="date"],
-        .summary-item select,
-        .summary-item span { /* Added span to target new financial fields */
-            width: 100%;
+
+        .form-group-custom input[type="text"],
+        .form-group-custom input[type="date"],
+        .form-group-custom input[type="email"],
+        .form-group-custom input[type="tel"],
+        .form-group-custom input[type="number"],
+        .form-group-custom select,
+        .list-group-item-custom input {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #fff;
             padding: 8px 12px;
             border-radius: 5px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            background-color: rgba(255, 255, 255, 0.15); /* Slightly more opaque for inputs */
-            color: #fff;
-            outline: none;
-            box-sizing: border-box; /* Include padding in width */
-            /* Add this for span for consistent height/alignment if needed */
-            display: inline-block;
-            vertical-align: middle;
-            line-height: 1.5; /* Adjust as needed to match input height */
-        }
-        .summary-item input[type="text"]:focus,
-        .summary-item input[type="email"]:focus,
-        .summary-item input[type="tel"]:focus,
-        .summary-item input[type="number"]:focus,
-        .summary-item input[type="date"]:focus,
-        .summary-item select:focus {
-            border-color: #90EE90; /* Light green border on focus */
-            box-shadow: 0 0 0 0.25rem rgba(144, 238, 144, 0.25); /* Light green shadow on focus */
-        }
-        /* Style for placeholder text in inputs */
-        .summary-item input::placeholder {
-            color: rgba(255, 255, 255, 0.6);
-        }
-        /* Style for date input arrows/calendar icon */
-        .summary-item input[type="date"]::-webkit-calendar-picker-indicator {
-            filter: invert(1); /* Makes the calendar icon white */
-        }
-        /* Style for select dropdown arrow */
-        .summary-item select {
-            -webkit-appearance: none;
+            width: 100%; /* Make inputs fill their container */
+            font-size: 0.95rem;
+            -webkit-appearance: none; /* Remove default styling for some inputs */
             -moz-appearance: none;
             appearance: none;
-            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22white%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13.6-6.4H18.9c-5%200-9.6%202-13.6%206.4-4%204-6.4%209.1-6.4%2014.2%200%205.1%202.4%2010.2%206.4%2014.2l127.9%20127.9c4%204%209.1%206.4%2014.2%206.4s10.2-2.4%2014.2-6.4L287%2098.8c4-4%206.4-9.1%206.4-14.2s-2.4-10.2-6.4-14.2z%22%2F%3E%3C%2Fsvg%3E');
-            background-repeat: no-repeat;
-            background-position: right 8px center;
-            background-size: 12px;
-            padding-right: 30px; /* Make space for the arrow */
-        }
-        .summary-item option {
-            background-color: #385E38; /* Dark green for dropdown options */
-            color: #fff;
         }
 
-        /* Styles for read-only inputs */
-        .summary-item input[readonly],
-        .summary-item select[disabled],
-        .summary-item span { /* Apply similar background to span for consistency */
-            background-color: rgba(255, 255, 255, 0.1); /* Slightly less opaque for read-only */
-            cursor: default;
+        .form-group-custom input:focus,
+        .form-group-custom select:focus,
+        .list-group-item-custom input:focus {
+            background-color: rgba(255, 255, 255, 0.15);
+            border-color: #90EE90; /* Light green on focus */
+            box-shadow: 0 0 0 0.25rem rgba(144, 238, 144, 0.25);
+            outline: none;
         }
 
-        /* Action buttons */
+        .form-group-custom label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.85rem;
+        }
+
+        /* Adjust input and select for better mobile display */
+        @media (max-width: 768px) {
+            .form-group-custom div, .list-group-item-custom div {
+                flex: 1 1 calc(50% - 10px); /* Two columns on tablets */
+            }
+        }
+        @media (max-width: 480px) {
+            .form-group-custom div, .list-group-item-custom div {
+                flex: 1 1 100%; /* Single column on small phones */
+            }
+        }
+
         .form-actions {
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 15px;
             margin-top: 30px;
+            flex-wrap: wrap; /* Allow buttons to wrap */
         }
+
         .action-btn {
             padding: 12px 25px;
             border-radius: 8px;
-            font-size: 1.1em;
             font-weight: bold;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            text-decoration: none;
             color: #fff;
-            border: none;
-            background-color: #00B86B; /* Default green for buttons */
+            transition: all 0.3s ease;
+            display: inline-flex; /* For icon alignment */
+            align-items: center;
+            gap: 8px; /* Space between icon and text */
+            justify-content: center;
+            min-width: 150px; /* Ensure buttons are sufficiently wide */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
         }
+
         .action-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+            color: #fff; /* Keep text white on hover */
         }
 
-        /* Specific button colors */
-        .edit-btn { /* For the new 'Edit' button */
-            background: linear-gradient(to right, #00B86B, #008f53);
+        .edit-btn {
+            background: linear-gradient(to right, #ffc107, #e0a800);
+            color: #212529; /* Dark text for yellow button */
         }
         .edit-btn:hover {
-            background: linear-gradient(to right, #008f53, #00B86B);
+            background: linear-gradient(to right, #e0a800, #ffc107);
+            color: #212529; /* Keep dark text on hover */
         }
-        .back-btn { /* For the 'Back to Dashboard' button */
-            background: linear-gradient(to right, #6c757d, #5a6268); /* Gray for back */
+
+        .back-btn {
+            background: linear-gradient(to right, #6c757d, #495057);
         }
         .back-btn:hover {
-            background: linear-gradient(to right, #5a6268, #6c757d);
+            background: linear-gradient(to right, #495057, #6c757d);
         }
 
-        /* List group items for affiliations/banks/POs */
-        .list-group-item-custom {
-            display: flex;
-            justify-content: space-between;
-            align-items: center; /* Align items to center */
-            padding: 10px 0;
-            border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
-            flex-wrap: wrap; /* Allow wrapping on smaller screens */
-            gap: 10px; /* Gap between inputs and button */
-        }
-        .list-group-item-custom:last-child {
-            border-bottom: none;
-        }
-        .list-group-item-custom input,
-        .list-group-item-custom select {
-            flex-grow: 1; /* Allow inputs to grow */
-            min-width: 150px; /* Minimum width for inputs */
-            max-width: 100%; /* Max width for inputs as there are no buttons */
-        }
-        /* If there are multiple inputs in a row, distribute space */
-        .list-group-item-custom input:not(:last-child) {
-            margin-right: 10px; /* Space between inputs */
-        }
-
-        .list-group-custom {
-            padding-left: 0;
-            list-style: none; /* Remove default list style */
-        }
         .no-records {
-            color: #fff; /* Changed from rgba to pure white */
-            font-style: italic;
             text-align: center;
-            padding: 15px;
-            background-color: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.6);
+            padding: 10px;
+            border: 1px dashed rgba(255, 255, 255, 0.3);
             border-radius: 5px;
             margin-top: 10px;
         }
 
-        /* Adjusted alerts */
-        .alert-info {
-            background-color: rgba(23, 162, 184, 0.2); /* Semi-transparent blue */
-            color: #fff; /* White text */
-            border-color: rgba(23, 162, 184, 0.4);
-            margin-top: 20px;
-        }
-        .alert-danger {
-            background-color: rgba(220, 53, 69, 0.2); /* Semi-transparent red */
-            color: #fff;
-            border-color: rgba(220, 53, 69, 0.4);
-            margin-top: 20px;
-        }
-
-        /* Shiny Button Effect (color-adaptive) */
+        /* Shiny Button Effect */
         .shiny-btn {
             position: relative;
             overflow: hidden;
@@ -287,229 +221,136 @@
         .shiny-btn:active {
             transform: translateY(1px);
         }
-        /* Color variants for shiny buttons */
+        /* Adjust shiny button text color for yellow button */
         .edit-btn.shiny-btn {
-            background: linear-gradient(90deg, #ffc107 0%, #e0a800 100%);
             color: #212529;
-        }
-        .back-btn.shiny-btn {
-            background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
-        }
-
-        /* Print styles */
-        @media print {
-            body {
-                background-color: #fff;
-                font-size: 10pt;
-                color: #000;
-                justify-content: flex-start;
-                align-items: flex-start;
-            }
-            .background-overlay {
-                display: none;
-            }
-            .customer-edit-container {
-                box-shadow: none;
-                border: none;
-                padding: 0;
-                margin: 0;
-                background-color: #fff;
-                color: #000;
-            }
-            .admin-edit-header, .form-actions {
-                display: none; /* Hide header and action buttons in print */
-            }
-            h2, h3 {
-                color: #000 !important;
-                border-color: #ccc !important;
-            }
-            .summary-section {
-                background-color: #f8f8f8 !important;
-                border: 1px solid #eee;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            .summary-section h3 i {
-                color: #555 !important;
-            }
-            .summary-item label,
-            .summary-item input,
-            .summary-item select,
-            .summary-item span { /* Ensure span also adapts for print */
-                color: #000 !important;
-                background-color: #fff !important;
-                border: 1px solid #ddd !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            .list-group-item-custom {
-                border-bottom: 1px dashed #ddd;
-            }
-            .list-group-item-custom strong {
-                color: #333 !important;
-            }
-            .no-records {
-                background-color: #f8f8f8 !important;
-                color: #555 !important;
-            }
-            .alert-info, .alert-danger {
-                background-color: #eee !important;
-                color: #333 !important;
-                border-color: #ccc !important;
-            }
         }
     </style>
 </head>
 <body>
     <div class="background-overlay"></div>
-    <div class="customer-edit-container">
-        <div class="admin-edit-header">
-            <h2><i class="fas fa-user"></i> View Customer Details</h2>
-            <div class="btn-group" role="group" aria-label="Admin Actions">
-                <a href="{{ url_for('admin_edit_customer', cust_no=user_data.customer.cust_no) }}" class="action-btn edit-btn shiny-btn">
-                    <i class="fas fa-edit"></i> Edit Customer
-                </a>
-                <a href="{{ url_for('admin_dashboard') }}" class="action-btn back-btn shiny-btn">
-                    <i class="fas fa-arrow-circle-left"></i> Back to Dashboard
-                </a>
-            </div>
-        </div>
-        <hr style="border: 0; border-top: 1.5px solid rgba(255, 255, 255, 0.5); margin: 10px 0 20px 0;" />
-
-        {# Flash messages for feedback after save/error #}
-        {% if get_flashed_messages(with_categories=true) %}
-            <div class="flashes">
-                {% for category, message in get_flashed_messages(with_categories=true) %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            </div>
-        {% endif %}
-
+    <div class="form-container">
         {% if user_data.customer %}
-        {# The form is kept for structure, but inputs are read-only and no submit button #}
+        <h2>Customer Details: {{ user_data.customer.custname }}</h2>
         <form>
-            <input type="hidden" name="cust_no" value="{{ user_data.customer.cust_no }}">
-
-            <section class="summary-section">
-                <h3><i class="fas fa-id-card"></i> Personal Information</h3>
-                <div class="summary-grid">
-                    <div class="summary-item">
-                        <label for="custname">Full Name:</label>
-                        <input type="text" id="custname" name="custname" value="{{ user_data.customer.custname | default('') }}" readonly>
+            <section>
+                <h4 class="section-title">Personal Information</h4>
+                <div class="form-group-custom">
+                    <div>
+                        <label>Customer No:</label>
+                        <input type="text" value="{{ user_data.customer.cust_no | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="datebirth">Date of Birth:</label>
-                        <input type="date" id="datebirth" name="datebirth" value="{{ user_data.customer.datebirth | default('') }}" readonly>
+                    <div>
+                        <label>Full Name:</label>
+                        <input type="text" value="{{ user_data.customer.custname | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="nationality">Nationality:</label>
-                        <input type="text" id="nationality" name="nationality" value="{{ user_data.customer.nationality | default('') }}" readonly>
+                    <div>
+                        <label>Date of Birth:</label>
+                        <input type="date" value="{{ user_data.customer.datebirth | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="citizenship">Citizenship:</label>
-                        <input type="text" id="citizenship" name="citizenship" value="{{ user_data.customer.citizenship | default('') }}" readonly>
+                    <div>
+                        <label>Nationality:</label>
+                        <input type="text" value="{{ user_data.customer.nationality | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="custsex">Sex:</label>
-                        <select id="custsex" name="custsex" disabled>
-                            <option value="">Select Sex</option>
-                            <option value="Male" {% if user_data.customer.custsex == 'Male' %}selected{% endif %}>Male</option>
-                            <option value="Female" {% if user_data.customer.custsex == 'Female' %}selected{% endif %}>Female</option>
-                            <option value="Other" {% if user_data.customer.custsex == 'Other' %}selected{% endif %}>Other</option>
-                        </select>
+                    <div>
+                        <label>Citizenship:</label>
+                        <input type="text" value="{{ user_data.customer.citizenship | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="placebirth">Place of Birth:</label>
-                        <input type="text" id="placebirth" name="placebirth" value="{{ user_data.customer.placebirth | default('') }}" readonly>
+                    <div>
+                        <label>Sex:</label>
+                        <input type="text" value="{{ user_data.customer.custsex | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="civilstatus">Civil Status:</label>
-                        <select id="civilstatus" name="civilstatus" disabled>
-                            <option value="">Select Civil Status</option>
-                            <option value="Single" {% if user_data.customer.civilstatus == 'Single' %}selected{% endif %}>Single</option>
-                            <option value="Married" {% if user_data.customer.civilstatus == 'Married' %}selected{% endif %}>Married</option>
-                            <option value="Divorced" {% if user_data.customer.civilstatus == 'Divorced' %}selected{% endif %}>Divorced</option>
-                            <option value="Widowed" {% if user_data.customer.civilstatus == 'Widowed' %}selected{% endif %}>Widowed</option>
-                        </select>
+                    <div>
+                        <label>Place of Birth:</label>
+                        <input type="text" value="{{ user_data.customer.placebirth | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="num_children">Number of Children:</label>
-                        <input type="number" id="num_children" name="num_children" value="{{ user_data.customer.num_children | default('') }}" readonly>
+                    <div>
+                        <label>Civil Status:</label>
+                        <input type="text" value="{{ user_data.customer.civilstatus | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="mmaiden_name">Mother's Maiden Name:</label>
-                        <input type="text" id="mmaiden_name" name="mmaiden_name" value="{{ user_data.customer.mmaiden_name | default('') }}" readonly>
+                    <div>
+                        <label>Number of Children:</label>
+                        <input type="number" value="{{ user_data.customer.num_children | default(0) }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="cust_address">Address:</label>
-                        <input type="text" id="cust_address" name="cust_address" value="{{ user_data.customer.cust_address | default('') }}" readonly>
+                    <div>
+                        <label>Mother's Maiden Name:</label>
+                        <input type="text" value="{{ user_data.customer.mmaiden_name | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="email_address">Email Address:</label>
-                        <input type="email" id="email_address" name="email_address" value="{{ user_data.customer.email_address | default('') }}" readonly>
+                    <div>
+                        <label>Address:</label>
+                        <input type="text" value="{{ user_data.customer.cust_address | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="contact_no">Contact No:</label>
-                        <input type="tel" id="contact_no" name="contact_no" value="{{ user_data.customer.contact_no | default('') }}" readonly>
+                    <div>
+                        <label>Email Address:</label>
+                        <input type="email" value="{{ user_data.customer.email_address | default('') }}" readonly>
+                    </div>
+                    <div>
+                        <label>Contact No:</label>
+                        <input type="tel" value="{{ user_data.customer.contact_no | default('') }}" readonly>
+                    </div>
+                    <div>
+                        <label>Registration Status:</label>
+                        <input type="text" value="{{ user_data.customer.registration_status | default('N/A') }}" readonly>
                     </div>
                 </div>
             </section>
 
-            <section class="summary-section">
-                <h3><i class="fas fa-heart"></i> Spouse Information</h3>
-                <div class="summary-grid">
-                    <div class="summary-item">
-                        <label for="sp_name">Spouse Name:</label>
-                        <input type="text" id="sp_name" name="sp_name" value="{{ user_data.spouse.sp_name | default('') }}" readonly>
+            {% if user_data.spouse %}
+            <section>
+                <h4 class="section-title">Spouse Information</h4>
+                <div class="form-group-custom">
+                    <div>
+                        <label>Spouse Name:</label>
+                        <input type="text" value="{{ user_data.spouse.sp_name | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="sp_datebirth">Spouse Date of Birth:</label>
-                        <input type="date" id="sp_datebirth" name="sp_datebirth" value="{{ user_data.spouse.sp_datebirth | default('') }}" readonly>
+                    <div>
+                        <label>Spouse Date of Birth:</label>
+                        <input type="date" value="{{ user_data.spouse.sp_datebirth | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="sp_profession">Spouse Profession:</label>
-                        <input type="text" id="sp_profession" name="sp_profession" value="{{ user_data.spouse.sp_profession | default('') }}" readonly>
+                    <div>
+                        <label>Spouse Profession:</label>
+                        <input type="text" value="{{ user_data.spouse.sp_profession | default('') }}" readonly>
                     </div>
                 </div>
             </section>
+            {% endif %}
 
-            <section class="summary-section">
-                <h3><i class="fas fa-briefcase"></i> Employment Information</h3>
-                <div class="summary-grid">
-                    <div class="summary-item">
-                        <label for="occ_type">Occupation Type:</label>
-                        <input type="text" id="occ_type" name="occ_type" value="{{ user_data.occupation.occ_type | default('') }}" readonly>
+            <section>
+                <h4 class="section-title">Employment Information</h4>
+                <div class="form-group-custom">
+                    <div>
+                        <label>Occupation Type:</label>
+                        <input type="text" value="{{ user_data.occupation.occ_type | default('') }}" readonly>
                     </div>
-                    <div class="summary-item">
-                        <label for="bus_nature">Nature of Business:</label>
-                        <input type="text" id="bus_nature" name="bus_nature" value="{{ user_data.occupation.bus_nature | default('') }}" readonly>
+                    <div>
+                        <label>Nature of Business:</label>
+                        <input type="text" value="{{ user_data.occupation.bus_nature | default('') }}" readonly>
                     </div>
-                    {# Employer details are only relevant if occupation type is 'Employed' #}
-                    {% if user_data.occupation.occ_type == 'Employed' %}
-                        <div class="summary-item">
-                            <label for="tin_id">TIN ID:</label>
-                            <input type="text" id="tin_id" name="tin_id" value="{{ user_data.employer_details.tin_id | default('') }}" readonly>
-                        </div>
-                        <div class="summary-item">
-                            <label for="empname">Company Name:</label>
-                            <input type="text" id="empname" name="empname" value="{{ user_data.employer_details.empname | default('') }}" readonly>
-                        </div>
-                        <div class="summary-item">
-                            <label for="emp_address">Employer Address:</label>
-                            <input type="text" id="emp_address" name="emp_address" value="{{ user_data.employer_details.emp_address | default('') }}" readonly>
-                        </div>
-                        <div class="summary-item">
-                            <label for="phonefax_no">Phone/Fax No:</label>
-                            <input type="tel" id="phonefax_no" name="phonefax_no" value="{{ user_data.employer_details.phonefax_no | default('') }}" readonly>
-                        </div>
-                        <div class="summary-item">
-                            <label for="job_title">Job Title:</label>
-                            <input type="text" id="job_title" name="job_title" value="{{ user_data.employer_details.job_title | default('') }}" readonly>
-                        </div>
-                        <div class="summary-item">
-                            <label for="emp_date">Employment Date:</label>
-                            <input type="date" id="emp_date" name="emp_date" value="{{ user_data.employer_details.emp_date | default('') }}" readonly>
-                        </div>
+                    {% if user_data.employer_details %}
+                    <div>
+                        <label>TIN ID:</label>
+                        <input type="text" value="{{ user_data.employer_details.tin_id | default('') }}" readonly>
+                    </div>
+                    <div>
+                        <label>Company Name:</label>
+                        <input type="text" value="{{ user_data.employer_details.empname | default('') }}" readonly>
+                    </div>
+                    <div>
+                        <label>Employer Address:</label>
+                        <input type="text" value="{{ user_data.employer_details.emp_address | default('') }}" readonly>
+                    </div>
+                    <div>
+                        <label>Phone/Fax No:</label>
+                        <input type="tel" value="{{ user_data.employer_details.phonefax_no | default('') }}" readonly>
+                    </div>
+                    <div>
+                        <label>Job Title:</label>
+                        <input type="text" value="{{ user_data.employer_details.job_title | default('') }}" readonly>
+                    </div>
+                    <div>
+                        <label>Employment Date:</label>
+                        <input type="date" value="{{ user_data.employer_details.emp_date | default('') }}" readonly>
+                    </div>
                     {% else %}
                         <div class="summary-item">
                             <p class="no-records">No employer details for this occupation type.</p>
@@ -518,29 +359,26 @@
                 </div>
             </section>
 
-        <section class="summary-section">
-            <h3><i class="fas fa-money-bill-wave"></i> Financial Information</h3>
-        <div class="summary-grid">
-        <div class="summary-item">
-            <label>Source of Wealth:</label>
-                          {# Changed from input to span for consistent display with userHome.html #}
-            <span>{{ user_data.financial_record.source_wealth | default('N/A') }}</span>
-                     </div>
-                      <div class="summary-item">
-            <label>Monthly Income:</label>
-                          {# Changed from input to span for consistent display with userHome.html #}
-            <span>{{ user_data.financial_record.mon_income | default('N/A') }}</span>
-        </div>
-        <div class="summary-item">
-            <label>Annual Income:</label>
-            {# Changed from input to span for consistent display with userHome.html #}
-            <span>{{ user_data.financial_record.ann_income | default('N/A') }}</span>
-        </div>
-    </div>
-</section>
+            <section>
+                <h4 class="section-title">Financial Information</h4>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <label>Source of Wealth:</label>
+                        <span>{{ user_data.financial_record.source_wealth | default('N/A') }}</span>
+                    </div>
+                    <div class="summary-item">
+                        <label>Monthly Income:</label>
+                        <span>{{ user_data.financial_record.mon_income | default('N/A') }}</span>
+                    </div>
+                    <div class="summary-item">
+                        <label>Annual Income:</label>
+                        <span>{{ user_data.financial_record.ann_income | default('N/A') }}</span>
+                    </div>
+                </div>
+            </section>
 
-            <section class="summary-section">
-                <h3><i class="fas fa-building"></i> Company Affiliations</h3>
+            <section>
+                <h4 class="section-title">Company Affiliations</h4>
                 <div id="company_affiliations_list" class="list-group-custom">
                     {% if user_data.company_affiliations %}
                         {% for affiliation in user_data.company_affiliations %}
@@ -555,8 +393,8 @@
                 </div>
             </section>
 
-            <section class="summary-section">
-                <h3><i class="fas fa-university"></i> Existing Bank Accounts</h3>
+            <section>
+                <h4 class="section-title">Existing Bank Accounts</h4>
                 <div id="existing_banks_list" class="list-group-custom">
                     {% if user_data.existing_banks %}
                         {% for bank in user_data.existing_banks %}
@@ -572,8 +410,8 @@
                 </div>
             </section>
 
-            <section class="summary-section">
-                <h3><i class="fas fa-users-cog"></i> Public Official Relationships</h3>
+            <section>
+                <h4 class="section-title">Public Official Relationships</h4>
                 <div id="public_official_relationships_list" class="list-group-custom">
                     {% if user_data.public_official_relationships %}
                         {% for po_rel in user_data.public_official_relationships %}
@@ -594,7 +432,7 @@
                 <a href="{{ url_for('admin_edit_customer', cust_no=user_data.customer.cust_no) }}" class="action-btn edit-btn shiny-btn">
                     <i class="fas fa-edit"></i> Edit Customer
                 </a>
-                <a href="{{ url_for('admin_dashboard') }}" class="action-btn back-btn shiny-btn">
+                <a href="{{ url_for('admin_dashboard_page') }}" class="action-btn back-btn shiny-btn">
                     <i class="fas fa-arrow-circle-left"></i> Back to Dashboard
                 </a>
             </div>
