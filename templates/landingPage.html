@@ -3,302 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LANDBANK CIMS - Login</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <style>
-    /* Global box-sizing for consistent layout */
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #1A5246; /* Dark green background from the image */
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-      color: white; /* Default text color for the body */
-    }
-
-    .header {
-      display: flex;
-      align-items: center;
-      padding: 1rem 2rem;
-      width: 100%;
-      position: relative; /* Needed for the logo to be absolutely centered without affecting other elements */
-    }
-
-    .logo-section {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      /* Absolute positioning to truly center it regardless of other elements */
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      white-space: nowrap; /* Prevent text wrapping in logo section */
-    }
-
-    .logo-section img {
-      width: 50px; /* Adjust logo size as needed */
-      height: auto;
-    }
-
-    .logo-section h1 {
-      font-size: 2.5rem;
-      margin: 0;
-      color: white;
-    }
-
-    .logo-section p {
-      font-size: 0.9rem;
-      margin: 0;
-      color: #D3D3D3; /* Lighter grey for tagline */
-    }
-
-    .menu-button {
-      /* Push to the right */
-      margin-left: 90%;
-      background-color: #2E8B57; /* Slightly lighter green for menu button */
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      z-index: 10; /* Ensure menu button is above logo if they overlap slightly */
-    }
-
-    .menu-button .icon {
-      width: 20px;
-      height: 20px;
-      fill: white; /* Fill SVG icon with white */
-    }
-
-    .login-container {
-      width: 100%;
-      max-width: 400px;
-      margin: auto; /* Centers the container vertically and horizontally */
-      padding: 2rem;
-      background: rgba(255, 255, 255, 0.9); /* Slightly transparent white */
-      border-radius: 10px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.2);
-      color: #333; /* Dark text for the form */
-      text-align: center;
-    }
-
-    h2 {
-      text-align: center;
-      color: #1A5246; /* Match header green */
-      margin-bottom: 1.5rem;
-    }
-
-    input[type=email],
-    input[type=password] {
-      width: calc(100% - 20px); /* Adjust for padding */
-      padding: 0.75rem 10px;
-      margin: 0.75rem 0;
-      border: 1px solid #ccc;
-      border-radius: 25px; /* More rounded corners for inputs */
-      background-color: #f9f9f9;
-      color: #333;
-    }
-
-    input[type=email]::placeholder,
-    input[type=password]::placeholder {
-      color: #888;
-    }
-
-    button {
-      width: 100%;
-      padding: 0.75rem;
-      background: #2E8B57; /* Green button */
-      color: white;
-      border: none;
-      border-radius: 25px; /* More rounded corners for button */
-      cursor: pointer;
-      font-size: 1.1rem;
-      font-weight: bold;
-      margin-top: 1rem;
-      transition: background-color 0.3s ease;
-    }
-
-    button:hover {
-      background-color: #287A4C; /* Darker green on hover */
-    }
-
-    .links {
-      margin-top: 1.5rem;
-      display: flex;
-      flex-direction: column; /* Stack links vertically */
-      gap: 1rem; /* Space between stacked links */
-      align-items: center; /* Center links horizontally */
-    }
-
-    .links a {
-      color: #1A5246; /* Green for links */
-      text-decoration: none;
-      font-weight: bold;
-      font-size: 1rem;
-      transition: color 0.3s ease;
-    }
-
-    .links a:hover {
-      color: #2E8B57; /* Lighter green on hover */
-    }
-
-    footer {
-      margin-top: auto; /* Pushes footer to the bottom */
-      background: rgba(0, 0, 0, 0.3); /* Semi-transparent dark background */
-      color: white;
-      text-align: center;
-      padding: 1rem;
-      width: 100%;
-    }
-
-    .social-icons {
-      display: flex;
-      justify-content: center; /* Center social icons */
-      margin-bottom: 10px;
-    }
-
-    .social-icons a {
-      margin: 0 10px;
-    }
-
-    .social-icons img {
-      width: 28px; /* Slightly larger icons */
-      height: 28px;
-      filter: invert(100%); /* Make icons white */
-      transition: transform 0.2s ease;
-    }
-
-    .social-icons img:hover {
-      transform: translateY(-3px); /* Slight lift on hover */
-    }
-
-    .flashed-messages {
-      text-align: center;
-      margin: 10px 0;
-      padding: 5px;
-      border-radius: 5px;
-    }
-    .flashed-messages p {
-      margin: 5px 0;
-      font-weight: bold;
-    }
-    .flashed-messages .error {
-      color: red;
-      background-color: rgba(255, 0, 0, 0.1);
-    }
-    .flashed-messages .success {
-      color: green;
-      background-color: rgba(0, 128, 0, 0.1);
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-      .header {
-        flex-direction: column; /* Stack logo and menu button */
-        padding: 1rem; /* Reduce padding */
-        align-items: flex-start; /* Align items to the start */
-      }
-
-      .logo-section {
-        position: static; /* Remove absolute positioning on small screens */
-        transform: none; /* Remove transform */
-        margin-bottom: 1rem; /* Add space below logo */
-        width: 100%; /* Take full width */
-        justify-content: center; /* Center logo content within its static position */
-      }
-
-      .menu-button {
-        margin-left: 0; /* Remove auto margin */
-        width: 100%; /* Make button full width */
-      }
-
-      .login-container {
-        padding: 1.5rem; /* Slightly less padding */
-        margin-top: 50px; /* Reduce top margin */
-      }
-    }
-
-    @media (max-width: 480px) {
-      .logo-section h1 {
-        font-size: 2rem; /* Smaller font for very small screens */
-      }
-      .logo-section p {
-        font-size: 0.8rem;
-      }
-      .login-container {
-        padding: 1rem;
-      }
-      input[type=email],
-      input[type=password],
-      button {
-        padding: 0.6rem 10px; /* Smaller padding for inputs/buttons */
-        font-size: 1rem;
-      }
-      .links a {
-        font-size: 0.9rem;
-      }
-    }
-  </style>
+  <title>Landbank - Customer Information Management System</title>
+  <link rel="stylesheet" href="static/landing.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cedarville+Cursive&family=Fredoka:wght@300..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Orbitron:wght@400..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-  <div class="header">
-    <div class="logo-section">
-      <img src="https://placehold.co/50x50/1A5246/FFFFFF?text=L" alt="LANDBANK Logo">
-      <div>
-        <h1>LANDBANK</h1>
-        <p>Empowering Filipinos for a Better Future</p>
+  <div class="background-overlay">
+    <video autoplay loop muted playsinline id="background-video">
+      <source src="static/assets/aerial-shot-LANDBANK.mp4" type="video/mp4"> 
+      Your browser does not support the video tag.
+    </video>
+  </div>
+  <header class="navbar">
+    <div class="navbar-left">
+      <img src="static/assets/LANDBANK.png" alt="Landbank Logo" class="navbar-logo">
+      <span class="navbar-title">LBMS PORTAL</span>
+    </div>
+    <nav class="navbar-links">
+      <a href="landing.html" class="active">HOME</a>
+      <a href="about">ABOUT</a>
+      <a href="services">SERVICES</a>
+      <a href="contact">CONTACT</a>
+    </nav>
+  </header>
+  <main class="main-content">
+    <div class="center-content">
+      <div class="subtitle">LANDBANK MANAGEMENT SYSTEM</div>
+      <img src="static/assets/LANDBANK.png" alt="Landbank Logo" class="main-logo">
+      <h1 class="portal-title">LBMS PORTAL</h1>
+      <div class="button-group">
+        <button class="register-btn"><i class="fas fa-user-plus"></i> REGISTER</button>
+        <button class="login-btn"><i class="fas fa-sign-in-alt"></i> LOG IN</button>
+      </div>
+      <div class="socials">
+        <a href="https://www.facebook.com/landbankofficial" target="_blank" rel="noopener noreferrer">
+          <img src="static/assets/facebook-logo.png" alt="Facebook" class="Facebook-logo" style="width: 35px; margin-bottom: 10px;">
+          </a>
+    
+        <a href="https://x.com/LBP_Official?s=09" target="_blank" rel="noopener noreferrer">
+          <img src="static/assets/twitter-logo.png" alt="Twitter" class="twitter-logo"style="width: 50px; margin-bottom: 10px; margin-right: 5%; margin-left: 9%;">
+        </a>
+        <a href="https://www.linkedin.com/company/land-bank-of-the-philippines-official/?originalSubdomain=ph" target="_blank" rel="noopener noreferrer">
+          <img src="static/assets/linkedin-logo.png" alt="LinkedIn" style="width: 35px; margin-bottom: 10px; margin-right: 5%;">
+        </a>
+        <a href="https://www.instagram.com/landbankofficial/?hl=en" target="_blank" rel="noopener noreferrer">
+          <img src="static/assets/instagram-logo.png" alt="Instagram" style="width: 35px; margin-bottom: 10px; margin-right: 5%;">
+        </a>
       </div>
     </div>
-    <button class="menu-button">
-      <svg class="icon" viewBox="0 0 24 24">
-        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
-      </svg>
-      MENU
-    </button>
-  </div>
-
-  <div class="login-container">
-    <h2>Login to LANDBANK</h2>
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="flashed-messages">
-          {% for category, message in messages %}
-            <p class="{{ category }}">{{ message }}</p>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
-
-    <form action="/login" method="POST">
-      <input type="email" name="email" placeholder="EMAIL" required>
-      <input type="password" name="password" placeholder="PASSWORD" required>
-      <button type="submit">LOGIN</button>
-    </form>
-    <div class="links">
-      <a href="/openAcc">OPEN AN ACCOUNT</a>
-      <a href="#">APPLY FOR A LOAN</a>
-    </div>
-  </div>
-
-  <footer>
-    <div class="social-icons">
-      <a href="#"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/facebook.svg" alt="Facebook"></a>
-      <a href="#"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/twitter.svg" alt="Twitter"></a>
-      <a href="#"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/linkedin.svg" alt="LinkedIn"></a>
-      <a href="#"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/instagram.svg" alt="Instagram"></a>
-    </div>
-    <p>&copy; 2025 LANDBANK. All rights reserved.</p>
-  </footer>
+  </main>
+  <!-- Add this inside <script> at the end of body in landing.html -->
+    <script>
+      document.querySelector('.register-btn').onclick = () => window.location.href = 'register';
+      document.querySelector('.login-btn').onclick = () => window.location.href = 'login';
+    </script>  
 </body>
 </html>
