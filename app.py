@@ -33,8 +33,7 @@ def _ensure_database_schema():
     This function should typically be run only once, or managed by a proper migration tool.
     For development, it runs on app startup.
     
-    NOTE: For production, consider a proper database migration tool like Alembic
-    instead of this simple schema check.
+    This version includes logic to ALTER specific column types if they are not as expected.
     """
     conn = None
     cursor = None
@@ -62,8 +61,8 @@ def _ensure_database_schema():
                 CREATE TABLE IF NOT EXISTS financial_record (
                     fin_code UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     source_wealth TEXT,
-                    mon_income TEXT, -- CHANGED FROM NUMERIC TO TEXT
-                    ann_income TEXT -- CHANGED FROM NUMERIC TO TEXT
+                    mon_income TEXT, -- Intended type
+                    ann_income TEXT -- Intended type
                 );
             """,
             'bank_details': """
@@ -181,6 +180,45 @@ def _ensure_database_schema():
             except psycopg2.Error as err:
                 print(f"  - ERROR creating/checking table {table_name}: {err}")
                 conn.rollback() # Rollback on error for this table
+        
+        # --- NEW ALTER TABLE LOGIC ---
+        # This section will attempt to alter the financial_record columns if they are not TEXT.
+        # This is a simplified approach for schema evolution. For production, consider Alembic.
+        try:
+            # Check current type of mon_income
+            cursor.execute("""
+                SELECT data_type FROM information_schema.columns
+                WHERE table_schema = current_schema() AND table_name = 'financial_record' AND column_name = 'mon_income';
+            """)
+            current_mon_income_type = cursor.fetchone()
+            
+            if current_mon_income_type and current_mon_income_type[0] != 'text':
+                print("  - Altering 'financial_record.mon_income' to TEXT...")
+                cursor.execute("ALTER TABLE financial_record ALTER COLUMN mon_income TYPE TEXT USING mon_income::text;")
+                conn.commit()
+                print("  - Successfully altered 'financial_record.mon_income' to TEXT.")
+
+            # Check current type of ann_income
+            cursor.execute("""
+                SELECT data_type FROM information_schema.columns
+                WHERE table_schema = current_schema() AND table_name = 'financial_record' AND column_name = 'ann_income';
+            """)
+            current_ann_income_type = cursor.fetchone()
+            
+            if current_ann_income_type and current_ann_income_type[0] != 'text':
+                print("  - Altering 'financial_record.ann_income' to TEXT...")
+                cursor.execute("ALTER TABLE financial_record ALTER COLUMN ann_income TYPE TEXT USING ann_income::text;")
+                conn.commit()
+                print("  - Successfully altered 'financial_record.ann_income' to TEXT.")
+
+        except psycopg2.Error as alter_err:
+            print(f"  - ERROR during ALTER TABLE for financial_record: {alter_err}")
+            conn.rollback()
+        except Exception as e:
+            print(f"  - Unexpected error during ALTER TABLE check: {e}")
+            conn.rollback()
+        # --- END NEW ALTER TABLE LOGIC ---
+
 
         print("\nPostgreSQL database schema check/update completed.")
     except psycopg2.Error as err:
@@ -736,9 +774,10 @@ def delete_customer():
 # --- Main execution block ---
 if __name__ == '__main__':
     # For Render, the PORT will be provided by an environment variable
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 0000))
     # In a production environment, debug should be False
-    # debug_mode is already defined globally
-    
+    debug_mode = os.environ.get('FLASK_DEBUG', 'True') == 'True'
+
     _ensure_database_schema() # Run schema check/update on app startup
     app.run(host='0.0.0.0', port=port, debug=debug_mode)
+
