@@ -2,7 +2,6 @@ import psycopg2 # Changed from mysql.connector
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import uuid # For generating unique IDs
 import os # To access environment variables
-import psycopg2.extras # Import DictCursor for dictionary results
 
 # Import the get_db_url function from db_config
 from db_config import get_db_url
@@ -10,9 +9,6 @@ from db_config import get_db_url
 app = Flask(__name__)
 # IMPORTANT: Change this to a strong, unique secret key for production environments
 app.secret_key = os.environ.get('SECRET_KEY', 'your_super_secret_key_here') # Use environment variable for secret key
-
-# Determine debug mode from environment variable. This allows more verbose errors in development.
-debug_mode = os.environ.get('FLASK_DEBUG', 'True') == 'True'
 
 def get_db_connection():
     """Establishes and returns a database connection using psycopg2 for PostgreSQL."""
@@ -521,6 +517,212 @@ def userHome():
         """, (cust_no,))
         user_data['public_official_relationships'] = cursor.fetchall()
 
+        return render_template('userHome.html', user_data=user_data)
+
+    except psycopg2.Error as err:
+        print(f"Database error in userHome: {err}")
+        flash(f'An error occurred while fetching your data: {err}', 'danger')
+        return redirect(url_for('login'))
+    except Exception as e:
+        print(f"Error in userHome: {e}")
+        flash('An unexpected error occurred while loading your profile.', 'danger')
+        return redirect(url_for('login'))
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.pop('user', None)
+    session.pop('user_email', None)
+    session.pop('cust_no', None)
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('username')
+        password_input = request.form.get('password')
+
+        if email == 'admin@gmail.com' and password_input == 'LandBank@2025':
+            session['admin'] = True
+            session['user_email'] = email
+            flash('Logged in successfully!', 'success')
+            return redirect(url_for('admin_dashboard'))
+
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            if not conn:
+                flash('Database connection failed.', 'danger')
+                return render_template('login.html', error='Database connection failed.')
+
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+            cursor.execute("""
+                SELECT credentials.cust_no, username, password, customer.custname
+                FROM credentials
+                JOIN customer ON credentials.cust_no = customer.cust_no
+                WHERE username = %s
+            """, (email,))
+            user = cursor.fetchone()
+
+            if user and user['password'] == password_input: # IMPORTANT: Replace with hashed password comparison in production
+                session['user'] = user['custname']
+                session['user_email'] = user['username']
+                session['cust_no'] = str(user['cust_no']) # Store as string, as UUID object might cause issues in session
+
+                flash('Logged in successfully!', 'success')
+                return redirect(url_for('userHome'))
+            else:
+                flash('Invalid username or password.', 'danger')
+                return render_template('login.html', error='Invalid username or password.')
+
+        except psycopg2.Error as err:
+            print(f"Database error during login: {err}")
+            flash(f'An error occurred during login: {err}', 'danger')
+            return render_template('login.html', error=f"Database error during login: {err}")
+        except Exception as e:
+            print(f"Login error: {e}")
+            flash('An unexpected error occurred during login.', 'danger')
+            return render_template('login.html', error='An unexpected error occurred during login.')
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    return render_template('login.html')
+
+@app.route('/registrationSuccess')
+def registration_success():
+    """Renders the registration success page."""
+    return render_template('registrationSuccess.html')
+
+
+@app.route('/admin_dashboard')
+def admin_dashboard():
+    if 'admin' not in session:
+        flash('Please login to access the admin dashboard.', 'warning')
+        return redirect(url_for('login'))
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            raise Exception("Database connection failed")
+
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cursor.execute("""
+            SELECT c.cust_no, c.custname, c.email_address, c.contact_no
+            FROM customer c
+            ORDER BY c.cust_no DESC
+        """)
+        customers = cursor.fetchall()
+
+        # Convert UUID objects to strings for display if needed
+        for customer in customers:
+            customer['cust_no'] = str(customer['cust_no'])
+
+        return render_template('admin_dashboard.html', customers=customers)
+
+    except Exception as e:
+        print(f"Error in admin_dashboard: {e}")
+        return "An error occurred while loading the dashboard.", 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+# --- ROUTE: Admin View Customer Details ---
+@app.route('/admin/customer/<uuid:cust_no>') # Use <uuid:cust_no> for automatic UUID conversion
+def admin_view_customer(cust_no):
+    if 'admin' not in session:
+        flash('Please login to access the admin dashboard.', 'warning')
+        return redirect(url_for('login'))
+
+    conn = None
+    cursor = None
+    user_data = {} # This dictionary will hold all fetched data
+
+    try:
+        conn = get_db_connection()
+        if not conn:
+            flash('Database connection failed.', 'danger')
+            return redirect(url_for('admin_dashboard'))
+
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+        # Fetch Customer Information
+        cursor.execute("""
+            SELECT c.*, o.occ_type, o.bus_nature, f.source_wealth, f.mon_income, f.ann_income
+            FROM customer c
+            LEFT JOIN occupation o ON c.occ_id = o.occ_id
+            LEFT JOIN financial_record f ON c.fin_code = f.fin_code
+            WHERE c.cust_no = %s
+        """, (cust_no,))
+        user_data['customer'] = cursor.fetchone()
+
+        if not user_data['customer']:
+            flash(f'Customer with ID {cust_no} not found.', 'danger')
+            return redirect(url_for('admin_dashboard'))
+
+        # Separate the fetched data for clarity in the template
+        user_data['occupation'] = {
+            'occ_type': user_data['customer'].get('occ_type'),
+            'bus_nature': user_data['customer'].get('bus_nature')
+        }
+        user_data['financial_record'] = {
+            'source_wealth': user_data['customer'].get('source_wealth'),
+            'mon_income': user_data['customer'].get('mon_income'),
+            'ann_income': user_data['customer'].get('ann_income')
+        }
+
+        # Fetch Spouse Information (if exists)
+        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (cust_no,))
+        user_data['spouse'] = cursor.fetchone()
+
+        # Fetch Employer Details (conditional on occupation type)
+        if user_data['occupation']['occ_type'] == 'Employed':
+            cursor.execute("""
+                SELECT ed.*
+                FROM employer_details ed
+                JOIN employment_details empd ON ed.emp_id = empd.emp_id
+                WHERE empd.cust_no = %s
+            """, (cust_no,))
+            user_data['employer_details'] = cursor.fetchone()
+        else:
+            user_data['employer_details'] = None
+
+        # Fetch Company Affiliations
+        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (cust_no,))
+        user_data['company_affiliations'] = cursor.fetchall()
+
+        # Fetch Existing Bank Accounts
+        cursor.execute("""
+            SELECT eb.acc_type, bd.bank_name, bd.branch
+            FROM existing_bank eb
+            JOIN bank_details bd ON eb.bank_code = bd.bank_code
+            WHERE eb.cust_no = %s
+        """, (cust_no,))
+        user_data['existing_banks'] = cursor.fetchall()
+
+        # Fetch Public Official Relationships
+        cursor.execute("""
+            SELECT cpr.relation_desc, pod.gov_int_name, pod.official_position, pod.branch_orgname
+            FROM cust_po_relationship cpr
+            JOIN public_official_details pod ON cpr.gov_int_id = pod.gov_int_id
+            WHERE cpr.cust_no = %s
+        """, (cust_no,))
+        user_data['public_official_relationships'] = cursor.fetchall()
+
+        # Render the template, passing all collected data in 'user_data'
         return render_template('admin_view_customer.html', user_data=user_data)
 
     except psycopg2.Error as err:
@@ -737,7 +939,7 @@ if __name__ == '__main__':
     # For Render, the PORT will be provided by an environment variable
     port = int(os.environ.get('PORT', 5000))
     # In a production environment, debug should be False
-    # debug_mode is already defined globally
-    
+    debug_mode = os.environ.get('FLASK_DEBUG', 'True') == 'True'
+
     _ensure_database_schema() # Run schema check/update on app startup
     app.run(host='0.0.0.0', port=port, debug=debug_mode)
