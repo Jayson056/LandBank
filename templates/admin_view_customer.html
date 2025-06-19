@@ -29,7 +29,10 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.2); /* Semi-transparent dark overlay */
+            background: url('/static/assets/landbank-BG.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
             z-index: -1; /* Behind content */
         }
 
@@ -45,6 +48,8 @@
             width: 100%;
             box-sizing: border-box; /* Include padding in width */
             border: 1px solid rgba(255, 255, 255, 0.2); /* Subtle white border */
+            position: relative;
+            z-index: 2;
         }
 
         .customer-edit-container h2 {
@@ -257,6 +262,39 @@
             margin-top: 20px;
         }
 
+        /* Shiny Button Effect (color-adaptive) */
+        .shiny-btn {
+            position: relative;
+            overflow: hidden;
+            color: #fff;
+            border: none;
+            outline: none;
+            transition: background 0.3s, box-shadow 0.3s, transform 0.2s;
+            box-shadow: 0 0 15px rgba(0,0,0,0.08);
+        }
+        .shiny-btn:before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(120deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: 0.5s;
+            z-index: 1;
+        }
+        .shiny-btn:hover:before {
+            left: 100%;
+        }
+        .shiny-btn:active {
+            transform: translateY(1px);
+        }
+        /* Color variants for shiny buttons */
+        .edit-btn.shiny-btn {
+            background: linear-gradient(90deg, #ffc107 0%, #e0a800 100%);
+            color: #212529;
+        }
+        .back-btn.shiny-btn {
+            background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
+        }
 
         /* Print styles */
         @media print {
@@ -328,16 +366,24 @@
         <div class="admin-edit-header">
             <h2><i class="fas fa-user"></i> View Customer Details</h2>
             <div class="btn-group" role="group" aria-label="Admin Actions">
-                <a href="{{ url_for('admin_edit_customer', cust_no=user_data.customer.cust_no) }}" class="action-btn edit-btn">
+                <a href="{{ url_for('admin_edit_customer', cust_no=user_data.customer.cust_no) }}" class="action-btn edit-btn shiny-btn">
                     <i class="fas fa-edit"></i> Edit Customer
                 </a>
-                <a href="{{ url_for('admin_dashboard') }}" class="action-btn back-btn">
+                <a href="{{ url_for('admin_dashboard') }}" class="action-btn back-btn shiny-btn">
                     <i class="fas fa-arrow-circle-left"></i> Back to Dashboard
                 </a>
             </div>
         </div>
         <hr style="border: 0; border-top: 1.5px solid rgba(255, 255, 255, 0.5); margin: 10px 0 20px 0;" />
 
+        {# Flash messages for feedback after save/error #}
+        {% if get_flashed_messages(with_categories=true) %}
+            <div class="flashes">
+                {% for category, message in get_flashed_messages(with_categories=true) %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
 
         {% if user_data.customer %}
         {# The form is kept for structure, but inputs are read-only and no submit button #}
@@ -545,10 +591,10 @@
             </section>
 
             <div class="form-actions">
-                <a href="{{ url_for('admin_edit_customer', cust_no=user_data.customer.cust_no) }}" class="action-btn edit-btn">
+                <a href="{{ url_for('admin_edit_customer', cust_no=user_data.customer.cust_no) }}" class="action-btn edit-btn shiny-btn">
                     <i class="fas fa-edit"></i> Edit Customer
                 </a>
-                <a href="{{ url_for('admin_dashboard') }}" class="action-btn back-btn">
+                <a href="{{ url_for('admin_dashboard') }}" class="action-btn back-btn shiny-btn">
                     <i class="fas fa-arrow-circle-left"></i> Back to Dashboard
                 </a>
             </div>
