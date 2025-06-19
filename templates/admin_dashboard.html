@@ -1,1156 +1,431 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Landbank CIMS - Admin Dashboard</title>
-    <!-- Material UI and Google Fonts -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+  <meta charset="UTF-8">
+  <title>Admin Dashboard - Landbank CIMS</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
 
-    <style>
-        /* Custom CSS to integrate with Material UI and define the overall theme */
-        body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start; /* Align to top to give space for content */
-            background-color: #385E38; /* A darker green from the background */
-            font-family: 'Roboto', 'Inter', sans-serif; /* Prioritize Roboto for Material UI */
-            color: #fff; /* Default text color */
-            overflow-y: auto; /* Allow scrolling if content overflows */
-        }
-
-        /* Styles for the main container */
-        .MuiContainer-root {
-            margin-top: 50px;
-            margin-bottom: 50px;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            background-color: rgba(255, 255, 255, 0.1); /* Semi-transparent white */
-            backdrop-filter: blur(5px); /* Optional: add a subtle blur effect */
-        }
-
-        /* Header styling */
-        .dashboard-header {
-            background-color: rgba(0, 0, 0, 0.2); /* Slightly darker transparent header */
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            display: flex;
-            flex-direction: column; /* Stack elements by default */
-            align-items: center; /* Center items horizontally */
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .dashboard-header .MuiTypography-h4 {
-            color: #fff; /* White title */
-            font-weight: bold;
-            margin-bottom: 15px; /* Space below title */
-            text-align: center;
-            width: 100%;
-        }
-
-        .search-filter-container {
-            display: flex;
-            flex-wrap: wrap; /* Allow items to wrap on smaller screens */
-            gap: 15px; /* Space between search, filters, and buttons */
-            width: 100%;
-            justify-content: center; /* Center items when wrapped */
-        }
-
-        .search-filter-container .MuiFormControl-root,
-        .search-filter-container .MuiTextField-root {
-            flex-grow: 1; /* Allow inputs/selects to grow */
-            min-width: 180px; /* Minimum width to prevent squishing */
-            max-width: 100%; /* Ensure they don't exceed parent width */
-        }
-
-        /* Table styling */
-        .customer-table {
-            background-color: rgba(255, 255, 255, 0.05); /* Very slight white background for table paper */
-            color: #fff; /* Text color for table */
-            border-radius: 8px;
-            overflow: hidden; /* Ensure table borders are rounded */
-        }
-
-        .MuiTableHead-root {
-            background-color: rgba(0, 0, 0, 0.3); /* Darker header for table */
-        }
-
-        .MuiTableCell-head {
-            color: #fff !important; /* White text for table headers */
-            font-weight: bold !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important;
-        }
-
-        .MuiTableCell-body {
-            color: #fff !important; /* White text for table body cells */
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-        }
-
-        .MuiTableRow-root:last-child .MuiTableCell-body {
-            border-bottom: none !important; /* No bottom border for last row */
-        }
-
-        /* Status badges */
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.8em;
-            font-weight: bold;
-            display: inline-block;
-            cursor: pointer;
-            text-align: center;
-        }
-        .status-active { background-color: #4CAF50; color: white; } /* Green */
-        .status-pending { background-color: #FFC107; color: #333; } /* Amber */
-        .status-inactive { background-color: #F44336; color: white; } /* Red */
-
-        /* Button styling (Material UI buttons are already good, but for custom touch) */
-        .MuiButton-containedPrimary {
-            background: linear-gradient(to right, #00B86B, #008f53); /* Landbank green gradient */
-            color: #fff;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease;
-        }
-        .MuiButton-containedPrimary:hover {
-            background: linear-gradient(to right, #008f53, #00B86B);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
-        }
-
-        .MuiButton-containedError {
-            background: linear-gradient(to right, #dc3545, #c82333); /* Red gradient */
-            color: #fff;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease;
-        }
-        .MuiButton-containedError:hover {
-            background: linear-gradient(to right, #c82333, #dc3545);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
-        }
-
-        .MuiIconButton-root {
-            color: #fff; /* White icons */
-        }
-        .MuiIconButton-root:hover {
-            color: #90EE90; /* Light green on hover */
-        }
-
-        /* Pagination styling */
-        .MuiTablePagination-root {
-            color: #fff !important; /* White text for pagination */
-        }
-        .MuiTablePagination-selectIcon,
-        .MuiTablePagination-actions .MuiIconButton-root {
-            color: #fff !important; /* White icons for pagination */
-        }
-        .MuiTablePagination-toolbar {
-            background-color: rgba(0, 0, 0, 0.2); /* Darker background for pagination toolbar */
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        /* Dialog/Modal specific styling */
-        .MuiDialog-paper {
-            background-color: #385E38 !important; /* Dark green background for dialogs */
-            color: #fff !important; /* White text */
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .MuiDialogTitle-root {
-            color: #fff !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .MuiDialogContent-root {
-            color: rgba(255, 255, 255, 0.9) !important;
-        }
-        .MuiDialogActions-root {
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .MuiTextField-root .MuiInputBase-input,
-        .MuiInputLabel-root,
-        .MuiInputBase-root .MuiSelect-select {
-            color: #fff !important; /* White text for input fields */
-        }
-        .MuiOutlinedInput-notchedOutline {
-            border-color: rgba(255, 255, 255, 0.4) !important; /* Lighter border for inputs */
-        }
-        .MuiInputLabel-root.Mui-focused {
-            color: #90EE90 !important; /* Light green for focused label */
-        }
-        .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
-            border-color: #90EE90 !important; /* Light green for focused outline */
-        }
-        .MuiFormHelperText-root.Mui-error {
-            color: #FFC107 !important; /* Yellow for error helper text */
-        }
-
-        /* Progress spinner */
-        .loading-spinner {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            width: 100vw;
-            position: fixed;
-            top: 0;
-            left: 0;
-            background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent overlay */
-            z-index: 9999;
-        }
-
-        /* Responsive adjustments */
-        @media (min-width: 600px) {
-            .dashboard-header {
-                flex-direction: row; /* Row layout on larger screens */
-                justify-content: space-between; /* Space out items */
-                align-items: center; /* Align items to center */
-            }
-            .dashboard-header .MuiTypography-h4 {
-                text-align: left;
-                margin-bottom: 0; /* Remove bottom margin */
-                width: auto;
-            }
-            .search-filter-container {
-                justify-content: flex-end; /* Align items to the right */
-            }
-        }
-    </style>
+    .background-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('/static/assets/landbank-BG.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      z-index: -1;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      /* Dark green background from other admin templates' body/overlay */
+      background-color: #385E38;
+      color: #fff; /* White text for general body content */
+    }
+    .container {
+      margin-top: 32px;
+      margin-bottom: 32px;
+      background-color: rgba(255, 255, 255, 0.1);
+      padding: 2rem 1rem;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      position: relative;
+      z-index: 2;
+      max-width: 100vw;
+      width: 100%;
+    }
+    @media (max-width: 991.98px) {
+      .container {
+        max-width: 100vw;
+        padding: 1rem 0.5rem;
+      }
+    }
+    @media (max-width: 575.98px) {
+      .container {
+        padding: 0.5rem 0.2rem;
+        border-radius: 0;
+      }
+    }
+    .table {
+      color: #fff; /* White text for table content */
+    }
+    .table th, .table td {
+      vertical-align: middle;
+      border-color: rgba(255, 255, 255, 0.3); /* Lighter border for table cells */
+    }
+    .table-dark { /* Specific style for table header */
+        background-color: rgba(0, 0, 0, 0.3); /* Slightly transparent dark background */
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      color: #fff; /* White text for header */
+      padding-bottom: 15px;
+      border-bottom: 1.5px solid rgba(255, 255, 255, 0.5); /* Lighter border */
+    }
+    h2, h4 {
+        color: #fff; /* White text for headings */
+        font-weight: bold; /* Make headings bold */
+    }
+    .btn-logout {
+      /* Consistent green button style */
+      background: linear-gradient(to right, #00B86B, #008f53);
+      color: #fff;
+      padding: 10px 20px; /* Adjust padding */
+      border-radius: 8px; /* Consistent border-radius */
+      font-weight: bold;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+      border: none;
+      transition: all 0.3s ease;
+    }
+    .btn-logout:hover {
+      background: linear-gradient(to right, #008f53, #00B86B);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+    }
+    .btn-action {
+        margin-right: 5px; /* Adds spacing between buttons */
+        padding: 8px 15px; /* Adjust padding for sm buttons */
+        border-radius: 8px; /* Consistent border-radius */
+        font-weight: bold;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    }
+    .btn-action:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 3px 5px rgba(0, 0, 0, 0.2);
+    }
+    /* Custom styles for view and edit buttons */
+    .btn-view {
+        background: linear-gradient(to right, #17a2b8, #138496); /* Info blue, can be changed to green if preferred */
+        color: white;
+    }
+    .btn-view:hover {
+        background: linear-gradient(to right, #138496, #17a2b8);
+    }
+    .btn-edit {
+        background: linear-gradient(to right, #ffc107, #e0a800); /* Warning yellow, can be changed to green if preferred */
+        color: #212529; /* Darker text for better contrast */
+    }
+    .btn-edit:hover {
+        background: linear-gradient(to right, #e0a800, #ffc107);
+        color: #212529;
+    }
+    .btn-danger {
+        background: linear-gradient(to right, #dc3545, #c82333); /* Danger red */
+        color: white;
+    }
+    .btn-danger:hover {
+        background: linear-gradient(to right, #c82333, #dc3545);
+    }
+    .text-center { /* Ensure text-center remains readable */
+        color: #fff;
+    }
+    /* Shiny Button Effect (color-adaptive) */
+    .shiny-btn {
+      position: relative;
+      overflow: hidden;
+      color: #fff;
+      border: none;
+      outline: none;
+      transition: background 0.3s, box-shadow 0.3s, transform 0.2s;
+      box-shadow: 0 0 15px rgba(0,0,0,0.08);
+    }
+    .shiny-btn:before {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(120deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: 0.5s;
+      z-index: 1;
+    }
+    .shiny-btn:hover:before {
+      left: 100%;
+    }
+    .shiny-btn:active {
+      transform: translateY(1px);
+    }
+    /* Color variants for shiny buttons */
+    .btn-primary.shiny-btn {
+      background: linear-gradient(90deg, #00B86B 0%, #008f53 100%);
+    }
+    .btn-secondary.shiny-btn {
+      background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
+    }
+    .btn-danger.shiny-btn {
+      background: linear-gradient(90deg, #dc3545 0%, #b02a37 100%);
+    }
+    .btn-view.shiny-btn {
+      background: linear-gradient(90deg, #17a2b8 0%, #138496 100%);
+    }
+    .btn-edit.shiny-btn {
+      background: linear-gradient(90deg, #ffc107 0%, #e0a800 100%);
+      color: #212529;
+    }
+    .btn-logout.shiny-btn {
+      background: linear-gradient(90deg, #00B86B 0%, #008f53 100%);
+    }
+    /* Remove .table-responsive to prevent scroll, ensure table fits container */
+    .table {
+      width: 100%;
+      table-layout: auto;
+    }
+  </style>
 </head>
 <body>
-    <div id="root"></div>
+  <div class="background-overlay"></div>
+  <div class="container container-fluid">
+    <div class="header">
+      <h2>Admin Dashboard</h2>
+      <form action="/logout" method="POST">
+        <button class="btn btn-logout shiny-btn">Logout</button>
+      </form>
+    </div>
 
-    <!-- React and Dependencies -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script crossorigin src="https://unpkg.com/@mui/material@5.15.0/umd/material-ui.development.js"></script>
-    <script crossorigin src="https://unpkg.com/@emotion/react@11.11.0/dist/emotion-react.umd.min.js"></script>
-    <script crossorigin src="https://unpkg.com/@emotion/styled@11.11.0/dist/emotion-styled.umd.min.js"></script>
-    <script crossorigin src="https://unpkg.com/axios/dist/axios.min.js"></script>
-    <script crossorigin src="https://unpkg.com/date-fns@2.30.0/dist/date-fns.min.js"></script>
-    
-    <!-- Babel for JSX transformation -->
-    <script src="https://unpkg.com/@babel/standalone@7.24.0/babel.min.js"></script>
+    <!-- Search, Filter, and Actions Controls -->
+    <form method="get" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end mb-4">
+      <div class="col-md-4 col-12">
+        <label for="search" class="form-label visually-hidden">Search</label>
+        <div class="input-group">
+          <span class="input-group-text" id="search-addon"><i class="fas fa-search"></i></span>
+          <input type="text" class="form-control" id="search" name="search" placeholder="Search customers..." value="{{ request.args.get('search', '') }}" aria-label="Search customers">
+        </div>
+      </div>
+      <div class="col-md-2 col-6">
+        <label for="status" class="form-label visually-hidden">Status</label>
+        <select class="form-select" id="status" name="status" aria-label="Filter by status">
+          <option value="">All Statuses</option>
+          <option value="Active" {% if request.args.get('status') == 'Active' %}selected{% endif %}>Active</option>
+          <option value="Pending" {% if request.args.get('status') == 'Pending' %}selected{% endif %}>Pending</option>
+          <option value="Inactive" {% if request.args.get('status') == 'Inactive' %}selected{% endif %}>Inactive</option>
+        </select>
+      </div>
+      <div class="col-md-2 col-6">
+        <label for="reg_date" class="form-label visually-hidden">Registration Date</label>
+        <input type="date" class="form-control" id="reg_date" name="reg_date" value="{{ request.args.get('reg_date', '') }}" aria-label="Filter by registration date">
+      </div>
+      <div class="col-md-2 col-4 d-grid">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary shiny-btn w-100 py-2" style="font-size: 1rem;" title="Refresh" aria-label="Refresh filters">
+          <i class="fas fa-sync-alt"></i> Refresh
+        </a>
+      </div>
+      <div class="col-md-2 col-4 d-grid ms-md-auto">
+        <button type="button" class="btn btn-primary shiny-btn w-100 py-2" style="font-size: 1rem;" data-bs-toggle="modal" data-bs-target="#addCustomerModal" aria-label="Add Customer">
+          <i class="fas fa-user-plus"></i> Add Customer
+        </button>
+      </div>
+    </form>
 
-    <!-- Custom Components (consolidated) -->
-    <script type="text/babel" data-presets="react">
-        const { useState, useEffect } = React; // Destructure here for convenience
-        const {
-            Container,
-            Paper,
-            Typography,
-            Button,
-            Box,
-            CircularProgress,
-            Snackbar,
-            Alert,
-            Table,
-            TableBody,
-            TableCell,
-            TableContainer,
-            TableHead,
-            TableRow,
-            IconButton,
-            TablePagination,
-            Menu,
-            MenuItem,
-            Dialog,
-            DialogTitle,
-            DialogContent,
-            DialogActions,
-            TextField,
-            Select,
-            FormControl,
-            InputLabel,
-            Grid,
-            InputAdornment
-        } = MaterialUI;
-
-        // CustomerTable Component
-        function CustomerTable({
-            customers,
-            onEdit,
-            onDelete,
-            onStatusChange,
-            page,
-            rowsPerPage,
-            totalCount,
-            onPageChange
-        }) {
-            const [statusMenuAnchor, setStatusMenuAnchor] = useState(null);
-            const [selectedCustomerId, setSelectedCustomerId] = useState(null);
-
-            const handleStatusClick = (event, customerId) => {
-                setStatusMenuAnchor(event.currentTarget);
-                setSelectedCustomerId(customerId);
-            };
-
-            const handleStatusClose = () => {
-                setStatusMenuAnchor(null);
-                setSelectedCustomerId(null);
-            };
-
-            const handleStatusSelect = (status) => {
-                onStatusChange(selectedCustomerId, status);
-                handleStatusClose();
-            };
-
-            const handleChangePage = (event, newPage) => {
-                onPageChange(newPage + 1); // Material-UI's page is 0-indexed, ours is 1-indexed
-            };
-
-            return (
-                <Paper className="customer-table">
-                    <TableContainer>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Customer ID</TableCell>
-                                    <TableCell>Full Name</TableCell>
-                                    <TableCell>Email</TableCell>
-                                    <TableCell>Phone</TableCell>
-                                    <TableCell>Status</TableCell>
-                                    <TableCell>Registration Date</TableCell>
-                                    <TableCell>Actions</TableCell> {/* Changed from Edit to Actions for clarity */}
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {customers.map((customer) => (
-                                    <TableRow key={customer.id}>
-                                        <TableCell>{customer.id}</TableCell>
-                                        <TableCell>{customer.fullName}</TableCell>
-                                        <TableCell>{customer.email}</TableCell>
-                                        <TableCell>{customer.phone}</TableCell>
-                                        <TableCell>
-                                            <div
-                                                className={`status-badge status-${customer.status.toLowerCase()}`}
-                                                onClick={(e) => handleStatusClick(e, customer.id)}
-                                                style={{ cursor: 'pointer' }}
-                                            >
-                                                {customer.status}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            {new Date(customer.registrationDate).toLocaleDateString()}
-                                        </TableCell>
-                                        <TableCell>
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => onEdit(customer)}
-                                                aria-label="edit"
-                                            >
-                                                <MaterialUI.Icon>edit</MaterialUI.Icon>
-                                            </IconButton>
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => onDelete(customer)}
-                                                aria-label="delete"
-                                            >
-                                                <MaterialUI.Icon>delete</MaterialUI.Icon>
-                                            </IconButton>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-
-                    <TablePagination
-                        component="div"
-                        count={totalCount}
-                        page={page - 1} /* Material-UI's page is 0-indexed */
-                        onPageChange={handleChangePage}
-                        rowsPerPage={rowsPerPage}
-                        rowsPerPageOptions={[10]} /* Only 10 per page for simplicity */
-                    />
-
-                    <Menu
-                        anchorEl={statusMenuAnchor}
-                        open={Boolean(statusMenuAnchor)}
-                        onClose={handleStatusClose}
-                    >
-                        <MenuItem onClick={() => handleStatusSelect('Active')}>Active</MenuItem>
-                        <MenuItem onClick={() => handleStatusSelect('Pending')}>Pending</MenuItem>
-                        <MenuItem onClick={() => handleStatusSelect('Inactive')}>Inactive</MenuItem>
-                    </Menu>
-                </Paper>
-            );
-        }
-
-        // EditCustomerModal Component
-        function EditCustomerModal({ open, customer, onClose, onSave }) {
-            const [formData, setFormData] = useState({
-                firstName: '',
-                lastName: '',
-                email: '',
-                phone: '',
-                dateOfBirth: '',
-                status: 'Active',
-                address: {
-                    street: '',
-                    city: '',
-                    state: '',
-                    zipCode: ''
-                }
-            });
-            const [loading, setLoading] = useState(false);
-            const [errors, setErrors] = useState({});
-
-            useEffect(() => {
-                if (customer) {
-                    setFormData({
-                        firstName: customer.firstName || '',
-                        lastName: customer.lastName || '',
-                        email: customer.email || '',
-                        phone: customer.phone || '',
-                        dateOfBirth: customer.dateOfBirth || '',
-                        status: customer.status || 'Active',
-                        address: customer.address || {
-                            street: '',
-                            city: '',
-                            state: '',
-                            zipCode: ''
-                        }
-                    });
-                } else {
-                    // Reset form for new customer
-                    setFormData({
-                        firstName: '',
-                        lastName: '',
-                        email: '',
-                        phone: '',
-                        dateOfBirth: '',
-                        status: 'Active',
-                        address: {
-                            street: '',
-                            city: '',
-                            state: '',
-                            zipCode: ''
-                        }
-                    });
-                }
-                setErrors({}); // Clear errors when modal opens/customer changes
-            }, [customer, open]); // Re-run when customer prop or open state changes
-
-            const handleChange = (e) => {
-                const { name, value } = e.target;
-                if (name.includes('.')) {
-                    const [parent, child] = name.split('.');
-                    setFormData(prev => ({
-                        ...prev,
-                        [parent]: {
-                            ...prev[parent],
-                            [child]: value
-                        }
-                    }));
-                } else {
-                    setFormData(prev => ({
-                        ...prev,
-                        [name]: value
-                    }));
-                }
-                setErrors(prev => ({ ...prev, [name]: undefined })); // Clear error for the field being edited
-            };
-
-            const validateForm = () => {
-                const newErrors = {};
-                if (!formData.firstName) newErrors.firstName = 'First name is required';
-                if (!formData.lastName) newErrors.lastName = 'Last name is required';
-                if (!formData.email) {
-                    newErrors.email = 'Email is required';
-                } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-                    newErrors.email = 'Email is invalid';
-                }
-                if (!formData.phone) {
-                    newErrors.phone = 'Phone number is required';
-                } else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
-                    newErrors.phone = 'Phone number must be 10 digits (digits only)';
-                }
-                setErrors(newErrors);
-                return Object.keys(newErrors).length === 0;
-            };
-
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                if (!validateForm()) return;
-
-                setLoading(true);
-                try {
-                    // Simulate API call for saving
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    onSave(customer ? { ...customer, ...formData } : { id: Date.now(), ...formData, fullName: `${formData.firstName} ${formData.lastName}`, registrationDate: new Date().toISOString().split('T')[0] });
-                } catch (error) {
-                    console.error('Failed to save customer:', error);
-                    setErrors({ submit: 'Failed to save customer. Please try again.' });
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            return (
-                <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-                    <DialogTitle>
-                        {customer ? 'Edit Customer' : 'Add New Customer'}
-                    </DialogTitle>
-                    <form onSubmit={handleSubmit}>
-                        <DialogContent>
-                            <Grid container spacing={2}>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        fullWidth
-                                        label="First Name"
-                                        name="firstName"
-                                        value={formData.firstName}
-                                        onChange={handleChange}
-                                        error={!!errors.firstName}
-                                        helperText={errors.firstName}
-                                        required
-                                        margin="dense"
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        fullWidth
-                                        label="Last Name"
-                                        name="lastName"
-                                        value={formData.lastName}
-                                        onChange={handleChange}
-                                        error={!!errors.lastName}
-                                        helperText={errors.lastName}
-                                        required
-                                        margin="dense"
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        fullWidth
-                                        label="Email"
-                                        name="email"
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={handleChange}
-                                        error={!!errors.email}
-                                        helperText={errors.email}
-                                        required
-                                        margin="dense"
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        fullWidth
-                                        label="Phone"
-                                        name="phone"
-                                        value={formData.phone}
-                                        onChange={handleChange}
-                                        error={!!errors.phone}
-                                        helperText={errors.phone}
-                                        required
-                                        margin="dense"
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        fullWidth
-                                        label="Date of Birth"
-                                        name="dateOfBirth"
-                                        type="date"
-                                        value={formData.dateOfBirth}
-                                        onChange={handleChange}
-                                        InputLabelProps={{ shrink: true }}
-                                        margin="dense"
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <FormControl fullWidth margin="dense">
-                                        <InputLabel>Status</InputLabel>
-                                        <Select
-                                            name="status"
-                                            value={formData.status}
-                                            onChange={handleChange}
-                                            label="Status"
-                                        >
-                                            <MenuItem value="Active">Active</MenuItem>
-                                            <MenuItem value="Pending">Pending</MenuItem>
-                                            <MenuItem value="Inactive">Inactive</MenuItem>
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <TextField
-                                        fullWidth
-                                        label="Street Address"
-                                        name="address.street"
-                                        value={formData.address.street}
-                                        onChange={handleChange}
-                                        margin="dense"
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        fullWidth
-                                        label="City"
-                                        name="address.city"
-                                        value={formData.address.city}
-                                        onChange={handleChange}
-                                        margin="dense"
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={3}>
-                                    <TextField
-                                        fullWidth
-                                        label="State"
-                                        name="address.state"
-                                        value={formData.address.state}
-                                        onChange={handleChange}
-                                        margin="dense"
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={3}>
-                                    <TextField
-                                        fullWidth
-                                        label="ZIP Code"
-                                        name="address.zipCode"
-                                        value={formData.address.zipCode}
-                                        onChange={handleChange}
-                                        margin="dense"
-                                    />
-                                </Grid>
-                                {errors.submit && (
-                                    <Grid item xs={12}>
-                                        <Alert severity="error">{errors.submit}</Alert>
-                                    </Grid>
-                                )}
-                            </Grid>
-                        </DialogContent>
-                        <DialogActions>
-                            <Button onClick={onClose} disabled={loading}>
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                variant="contained"
-                                color="primary"
-                                disabled={loading}
-                                startIcon={loading ? <CircularProgress size={24} /> : null}
-                            >
-                                {loading ? 'Saving...' : 'Save Changes'}
-                            </Button>
-                        </DialogActions>
-                    </form>
-                </Dialog>
-            );
-        }
-
-        // DeleteCustomerModal Component
-        function DeleteCustomerModal({ open, customer, onClose, onConfirm }) {
-            const [loading, setLoading] = useState(false);
-
-            const handleDelete = async () => {
-                if (!customer) return;
-                
-                setLoading(true);
-                try {
-                    // Simulate API call for deletion
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    onConfirm(customer.id); // Pass customer ID to onConfirm
-                } catch (error) {
-                    console.error('Failed to delete customer:', error);
-                    // You might want to show a toast/alert for the user here
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            return (
-                <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-                    <DialogTitle>
-                        <Box display="flex" alignItems="center" gap={1}>
-                            <MaterialUI.Icon color="error">warning</MaterialUI.Icon>
-                            Confirm Deletion
-                        </Box>
-                    </DialogTitle>
-                    <DialogContent>
-                        <Typography variant="body1" paragraph>
-                            Are you sure you want to permanently delete {customer?.fullName}? This action cannot be undone.
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary">
-                            Customer ID: {customer?.id}
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary">
-                            Email: {customer?.email}
-                        </Typography>
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={onClose} disabled={loading}>
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleDelete}
-                            color="error"
-                            variant="contained"
-                            disabled={loading}
-                            startIcon={loading ? <CircularProgress size={20} /> : <MaterialUI.Icon>delete</MaterialUI.Icon>}
-                        >
-                            {loading ? 'Deleting...' : 'Delete Customer'}
-                        </Button>
-                    </DialogActions>
-                </Dialog>
-            );
-        }
-
-        // SearchBar Component
-        function SearchBar({ value, onChange }) {
-            return (
-                <TextField
-                    placeholder="Search customers..."
-                    value={value}
-                    onChange={onChange}
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <MaterialUI.Icon>search</MaterialUI.Icon>
-                            </InputAdornment>
-                        ),
-                    }}
-                    sx={{
-                        '.MuiInputBase-root': {
-                            backgroundColor: 'rgba(255, 255, 255, 0.1)', /* Slightly opaque background */
-                            color: '#fff', /* White text */
-                        },
-                        '.MuiOutlinedInput-notchedOutline': {
-                            borderColor: 'rgba(255, 255, 255, 0.4) !important', /* Lighter border */
-                        },
-                        '.MuiSvgIcon-root': {
-                            color: '#fff', /* White icon */
-                        },
-                        '.MuiInputBase-input::placeholder': {
-                            color: 'rgba(255, 255, 255, 0.7)', /* Placeholder color */
-                            opacity: 1, /* Ensure placeholder is visible */
-                        },
-                    }}
-                />
-            );
-        }
-
-        // FilterDropdown Component
-        function FilterDropdown({ statusFilter, onStatusChange, dateFilter, onDateChange }) {
-            return (
-                <Box sx={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                    <FormControl size="small" sx={{ minWidth: 120, '.MuiInputBase-root': { backgroundColor: 'rgba(255, 255, 255, 0.1)' } }}>
-                        <InputLabel sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Status</InputLabel>
-                        <Select
-                            value={statusFilter}
-                            onChange={(e) => onStatusChange(e.target.value)}
-                            label="Status"
-                            sx={{ color: '#fff' }}
-                        >
-                            <MenuItem value="all">All</MenuItem>
-                            <MenuItem value="Active">Active</MenuItem>
-                            <MenuItem value="Pending">Pending</MenuItem>
-                            <MenuItem value="Inactive">Inactive</MenuItem>
-                        </Select>
-                    </FormControl>
-
-                    <TextField
-                        label="Registration Date"
-                        type="date"
-                        value={dateFilter || ''}
-                        onChange={(e) => onDateChange(e.target.value ? e.target.value : null)}
-                        size="small"
-                        InputLabelProps={{ shrink: true }}
-                        sx={{
-                            '.MuiInputBase-input': { color: '#fff' },
-                            '.MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.7)' },
-                            '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.4) !important' },
-                            '.MuiSvgIcon-root': { color: '#fff' }, /* Calendar icon color */
-                            '.MuiInputBase-root': { backgroundColor: 'rgba(255, 255, 255, 0.1)' },
-                        }}
-                    />
-                </Box>
-            );
-        }
-
-        // App Component
-        function App() {
-            const [customers, setCustomers] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [error, setError] = useState(null);
-            const [page, setPage] = useState(1);
-            const [rowsPerPage] = useState(10);
-            const [searchQuery, setSearchQuery] = useState('');
-            const [statusFilter, setStatusFilter] = useState('all');
-            const [dateFilter, setDateFilter] = useState(null); // Stored as YYYY-MM-DD string
-            const [selectedCustomer, setSelectedCustomer] = useState(null);
-            const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-            const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-            const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
-
-            // Mock data for development
-            const mockCustomers = [
-                {
-                    id: '1c074604-38a5-43ec-9570-e55ff0519e4a',
-                    firstName: 'Jayson',
-                    lastName: 'Combate',
-                    fullName: 'Jayson Combate',
-                    email: 'jayson.combate05@gmail.com',
-                    phone: '+639975330913',
-                    status: 'Active',
-                    registrationDate: '2024-01-01',
-                    dateOfBirth: '1990-01-01',
-                    address: {
-                        street: '123 Main St',
-                        city: 'Manila',
-                        state: 'NCR',
-                        zipCode: '1000'
-                    }
-                },
-                {
-                    id: '2a4b6c8d-1234-5678-90ab-cdef12345678',
-                    firstName: 'Jane',
-                    lastName: 'Smith',
-                    fullName: 'Jane Smith',
-                    email: 'jane.smith@example.com',
-                    phone: '0987654321',
-                    status: 'Pending',
-                    registrationDate: '2024-01-02',
-                    dateOfBirth: '1992-02-02',
-                    address: {
-                        street: '456 Oak Ave',
-                        city: 'Quezon City',
-                        state: 'NCR',
-                        zipCode: '1100'
-                    }
-                },
-                {
-                    id: '3e6f9a1b-c3d4-e5f6-7a8b-9c0d1e2f3a4b',
-                    firstName: 'Michael',
-                    lastName: 'Johnson',
-                    fullName: 'Michael Johnson',
-                    email: 'michael.j@example.com',
-                    phone: '09123456789',
-                    status: 'Inactive',
-                    registrationDate: '2024-02-15',
-                    dateOfBirth: '1985-05-20',
-                    address: {
-                        street: '789 Pine Ln',
-                        city: 'Makati',
-                        state: 'NCR',
-                        zipCode: '1200'
-                    }
-                },
-                 {
-                    id: '4f7e0d3c-a9b8-c7d6-e5f4-3g2h1i0j9k8l',
-                    firstName: 'Emily',
-                    lastName: 'Brown',
-                    fullName: 'Emily Brown',
-                    email: 'emily.b@example.com',
-                    phone: '09345678901',
-                    status: 'Active',
-                    registrationDate: '2024-03-10',
-                    dateOfBirth: '1995-11-01',
-                    address: {
-                        street: '101 Elm Blvd',
-                        city: 'Taguig',
-                        state: 'NCR',
-                        zipCode: '1630'
-                    }
-                },
-                {
-                    id: '5g8h1i4j-k2l3-m6n9-o0p1-q2r3s4t5u6v7',
-                    firstName: 'David',
-                    lastName: 'Wilson',
-                    fullName: 'David Wilson',
-                    email: 'david.w@example.com',
-                    phone: '09456789012',
-                    status: 'Pending',
-                    registrationDate: '2024-04-05',
-                    dateOfBirth: '1988-08-12',
-                    address: {
-                        street: '222 Birch Rd',
-                        city: 'Pasig',
-                        state: 'NCR',
-                        zipCode: '1600'
-                    }
-                },
-                {
-                    id: '6k9l2m5n-o3p4-q7r0-s1t2-u3v4w5x6y7z8',
-                    firstName: 'Sarah',
-                    lastName: 'Garcia',
-                    fullName: 'Sarah Garcia',
-                    email: 'sarah.g@example.com',
-                    phone: '09567890123',
-                    status: 'Active',
-                    registrationDate: '2024-05-20',
-                    dateOfBirth: '1993-03-25',
-                    address: {
-                        street: '333 Cedar St',
-                        city: 'Mandaluyong',
-                        state: 'NCR',
-                        zipCode: '1550'
-                    }
-                },
-                {
-                    id: '7p0q3r6s-t4u5-v8w1-x2y3-z4a5b6c7d8e9',
-                    firstName: 'Chris',
-                    lastName: 'Martinez',
-                    fullName: 'Chris Martinez',
-                    email: 'chris.m@example.com',
-                    phone: '09678901234',
-                    status: 'Active',
-                    registrationDate: '2024-06-01',
-                    dateOfBirth: '1980-09-10',
-                    address: {
-                        street: '444 Spruce Pkwy',
-                        city: 'San Juan',
-                        state: 'NCR',
-                        zipCode: '1500'
-                    }
-                },
-                {
-                    id: '8t1u4v7w-x5y6-z9a2-b3c4-d5e6f7g8h9i0',
-                    firstName: 'Anna',
-                    lastName: 'Rodriguez',
-                    fullName: 'Anna Rodriguez',
-                    email: 'anna.r@example.com',
-                    phone: '09789012345',
-                    status: 'Pending',
-                    registrationDate: '2024-06-10',
-                    dateOfBirth: '1998-12-05',
-                    address: {
-                        street: '555 Willow Dr',
-                        city: 'Pasay',
-                        state: 'NCR',
-                        zipCode: '1300'
-                    }
-                },
-                {
-                    id: '9y2z5a8b-c6d7-e0f1-g2h3-i4j5k6l7m8n9',
-                    firstName: 'Robert',
-                    lastName: 'Hernandez',
-                    fullName: 'Robert Hernandez',
-                    email: 'robert.h@example.com',
-                    phone: '09890123456',
-                    status: 'Inactive',
-                    registrationDate: '2024-06-18',
-                    dateOfBirth: '1975-07-18',
-                    address: {
-                        street: '666 Poplar Ct',
-                        city: 'Parañaque',
-                        state: 'NCR',
-                        zipCode: '1700'
-                    }
-                },
-                {
-                    id: '10c3d6e9-f7g8-h1i4-j5k6-l7m8n9o0p1q2',
-                    firstName: 'Maria',
-                    lastName: 'Gonzales',
-                    fullName: 'Maria Gonzales',
-                    email: 'maria.g@example.com',
-                    phone: '09901234567',
-                    status: 'Active',
-                    registrationDate: '2024-06-20',
-                    dateOfBirth: '1991-04-30',
-                    address: {
-                        street: '777 Cypress Ave',
-                        city: 'Las Piñas',
-                        state: 'NCR',
-                        zipCode: '1740'
-                    }
-                }
-            ];
-
-
-            // Fetch customers data (simulated)
-            const fetchCustomers = async () => {
-                try {
-                    setLoading(true);
-                    // In a real app, you would make an Axios call here:
-                    // const response = await axios.get('/api/customers');
-                    // setCustomers(response.data);
-                    
-                    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-                    setCustomers(mockCustomers); // Use mock data
-                    setError(null);
-                } catch (err) {
-                    setError('Failed to fetch customers. Please try again later.');
-                    setToast({ open: true, message: 'Failed to fetch customers', severity: 'error' });
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            useEffect(() => {
-                fetchCustomers();
-            }, []); // Empty dependency array means this runs once on mount
-
-            // Filter customers based on search query and filters
-            const filteredCustomers = customers.filter(customer => {
-                const matchesSearch = customer.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                      customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                      customer.id.toLowerCase().includes(searchQuery.toLowerCase()) || /* Search by ID */
-                                      customer.phone.includes(searchQuery); /* Search by Phone */
-
-                const matchesStatus = statusFilter === 'all' || customer.status === statusFilter;
-                
-                const customerRegDate = new Date(customer.registrationDate);
-                const matchesDate = !dateFilter || (dateFns.isSameDay(customerRegDate, new Date(dateFilter)));
-                
-                return matchesSearch && matchesStatus && matchesDate;
-            });
-
-            // Handle customer actions
-            const handleEdit = (customer) => {
-                setSelectedCustomer(customer);
-                setIsEditModalOpen(true);
-            };
-
-            const handleDelete = (customer) => {
-                setSelectedCustomer(customer);
-                setIsDeleteModalOpen(true);
-            };
-
-            const handleStatusChange = async (customerId, newStatus) => {
-                try {
-                    // Simulate API call for status update
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    setCustomers(prev => prev.map(customer =>
-                        customer.id === customerId
-                            ? { ...customer, status: newStatus }
-                            : customer
-                    ));
-                    setToast({ open: true, message: 'Status updated successfully', severity: 'success' });
-                } catch (err) {
-                    setToast({ open: true, message: 'Failed to update status', severity: 'error' });
-                }
-            };
-
-            const handleSaveCustomer = (updatedCustomer) => {
-                // Logic to update or add customer in state
-                setCustomers(prevCustomers => {
-                    const existingCustomerIndex = prevCustomers.findIndex(c => c.id === updatedCustomer.id);
-                    if (existingCustomerIndex > -1) {
-                        // Update existing customer
-                        const newCustomers = [...prevCustomers];
-                        newCustomers[existingCustomerIndex] = updatedCustomer;
-                        return newCustomers;
-                    } else {
-                        // Add new customer
-                        return [...prevCustomers, updatedCustomer];
-                    }
-                });
-                setToast({ open: true, message: 'Customer saved successfully!', severity: 'success' });
-            };
-
-            const handleConfirmDelete = (customerIdToDelete) => {
-                // Logic to delete customer from state
-                setCustomers(prevCustomers => prevCustomers.filter(c => c.id !== customerIdToDelete));
-                setToast({ open: true, message: 'Customer deleted successfully!', severity: 'success' });
-            };
-
-            const handleCloseToast = () => {
-                setToast({ ...toast, open: false });
-            };
-
-            if (loading) {
-                return (
-                    <Box className="loading-spinner">
-                        <CircularProgress sx={{ color: '#00B86B' }} />
-                        <Typography variant="h6" sx={{ color: '#fff', mt: 2 }}>Loading Customers...</Typography>
-                    </Box>
-                );
-            }
-
-            if (error) {
-                return (
-                    <Container>
-                        <Alert severity="error">{error}</Alert>
-                    </Container>
-                );
-            }
-
-            return (
-                <Container className="admin-container">
-                    <Paper className="dashboard-header">
-                        <Typography variant="h4" component="h1">
-                            Customer Management
-                        </Typography>
-                        <Box className="search-filter-container">
-                            <SearchBar
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                            <FilterDropdown
-                                statusFilter={statusFilter}
-                                onStatusChange={setStatusFilter}
-                                dateFilter={dateFilter}
-                                onDateChange={setDateFilter}
-                            />
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                startIcon={<MaterialUI.Icon>refresh</MaterialUI.Icon>}
-                                onClick={fetchCustomers}
-                            >
-                                Refresh
-                            </Button>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                startIcon={<MaterialUI.Icon>add</MaterialUI.Icon>}
-                                onClick={() => {
-                                    setSelectedCustomer(null); // Clear selected customer for "Add"
-                                    setIsEditModalOpen(true);
-                                }}
-                            >
-                                Add Customer
-                            </Button>
-                        </Box>
-                    </Paper>
-
-                    <CustomerTable
-                        customers={filteredCustomers}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                        onStatusChange={handleStatusChange}
-                        page={page}
-                        rowsPerPage={rowsPerPage}
-                        totalCount={filteredCustomers.length}
-                        onPageChange={setPage}
-                    />
-
-                    <EditCustomerModal
-                        open={isEditModalOpen}
-                        customer={selectedCustomer}
-                        onClose={() => setIsEditModalOpen(false)}
-                        onSave={handleSaveCustomer}
-                    />
-
-                    <DeleteCustomerModal
-                        open={isDeleteModalOpen}
-                        customer={selectedCustomer}
-                        onClose={() => setIsDeleteModalOpen(false)}
-                        onConfirm={handleConfirmDelete}
-                    />
-
-                    <Snackbar open={toast.open} autoHideDuration={6000} onClose={handleCloseToast}>
-                        <Alert onClose={handleCloseToast} severity={toast.severity} sx={{ width: '100%' }}>
-                            {toast.message}
-                        </Alert>
-                    </Snackbar>
-                </Container>
-            );
-        }
-
-        // Render the App component into the 'root' div
-        ReactDOM.render(<App />, document.getElementById('root'));
-    </script>
+    <h4>Registered Customers</h4>
+    <table class="table table-bordered table-hover align-middle mb-0" style="width: 100vw; max-width: 100%;">
+      <thead class="table-dark">
+        <tr>
+          <th>#</th>
+          <th>Customer No</th>
+          <th>Full Name</th>
+          <th>Email Address</th>
+          <th>Contact No</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for customer in customers %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ customer.cust_no }}</td>
+          <td>{{ customer.custname }}</td>
+          <td>{{ customer.email_address }}</td>
+          <td>{{ customer.contact_no }}</td>
+          <td>
+            {% set status = customer.status or customer.registration_status or 'Active' %}
+            {% if status == 'Active' %}
+              <span class="badge bg-success"><i class="fas fa-check-circle"></i> Active</span>
+            {% elif status == 'Pending' %}
+              <span class="badge bg-warning text-dark"><i class="fas fa-hourglass-half"></i> Pending</span>
+            {% elif status == 'Inactive' %}
+              <span class="badge bg-secondary"><i class="fas fa-ban"></i> Inactive</span>
+            {% else %}
+              <span class="badge bg-light text-dark">{{ status }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="d-flex justify-content-center align-items-center gap-1" style="min-width: 150px; white-space: nowrap;">
+              <a href="{{ url_for('admin_view_customer', cust_no=customer.cust_no) }}" class="btn btn-view btn-sm btn-action shiny-btn d-flex align-items-center">
+                  <i class="fas fa-eye"></i> <span class="ms-1">View</span>
+              </a>
+              <a href="{{ url_for('admin_edit_customer', cust_no=customer.cust_no) }}" class="btn btn-edit btn-sm btn-action shiny-btn d-flex align-items-center">
+                  <i class="fas fa-edit"></i> <span class="ms-1">Edit</span>
+              </a>
+              <form action="{{ url_for('delete_customer') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this customer?');" style="display:inline;">
+                <input type="hidden" name="cust_no" value="{{ customer.cust_no }}">
+                <button type="submit" class="btn btn-danger btn-sm btn-action shiny-btn d-flex align-items-center">
+                    <i class="fas fa-trash-alt"></i> <span class="ms-1">Delete</span>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="text-center">No customers found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+    <!-- Add Customer Modal -->
+    <div class="modal fade" id="addCustomerModal" tabindex="-1" aria-labelledby="addCustomerModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="color:#222;">
+          <form action="{{ url_for('admin_add_customer') }}" method="POST">
+            <div class="modal-header">
+              <h5 class="modal-title" id="addCustomerModalLabel"><i class="fas fa-user-plus"></i> Add New Customer</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Full Name</label>
+                  <input type="text" name="custname" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Date of Birth</label>
+                  <input type="date" name="datebirth" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Nationality</label>
+                  <input type="text" name="nationality" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Citizenship</label>
+                  <input type="text" name="citizenship" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Sex</label>
+                  <select name="custsex" class="form-select" required>
+                    <option value="">Select Sex</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Place of Birth</label>
+                  <input type="text" name="placebirth" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Civil Status</label>
+                  <select name="civilstatus" class="form-select" required>
+                    <option value="">Select Civil Status</option>
+                    <option value="Single">Single</option>
+                    <option value="Married">Married</option>
+                    <option value="Divorced">Divorced</option>
+                    <option value="Widowed">Widowed</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Number of Children</label>
+                  <input type="number" name="num_children" class="form-control">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Mother's Maiden Name</label>
+                  <input type="text" name="mmaiden_name" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Address</label>
+                  <input type="text" name="cust_address" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Email Address</label>
+                  <input type="email" name="email_address" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Contact No</label>
+                  <input type="tel" name="contact_no" class="form-control" required>
+                </div>
+                <!-- Spouse Info -->
+                <div class="col-12"><hr><strong>Spouse Information</strong></div>
+                <div class="col-md-4">
+                  <label class="form-label">Spouse Name</label>
+                  <input type="text" name="sp_name" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Spouse Date of Birth</label>
+                  <input type="date" name="sp_datebirth" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Spouse Profession</label>
+                  <input type="text" name="sp_profession" class="form-control">
+                </div>
+                <!-- Employment Info -->
+                <div class="col-12"><hr><strong>Employment Information</strong></div>
+                <div class="col-md-4">
+                  <label class="form-label">Occupation Type</label>
+                  <input type="text" name="occ_type" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Nature of Business</label>
+                  <input type="text" name="bus_nature" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">TIN ID</label>
+                  <input type="text" name="tin_id" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Company Name</label>
+                  <input type="text" name="empname" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Employer Address</label>
+                  <input type="text" name="emp_address" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Phone/Fax No</label>
+                  <input type="tel" name="phonefax_no" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Job Title</label>
+                  <input type="text" name="job_title" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Employment Date</label>
+                  <input type="date" name="emp_date" class="form-control">
+                </div>
+                <!-- Financial Info -->
+                <div class="col-12"><hr><strong>Financial Information</strong></div>
+                <div class="col-md-4">
+                  <label class="form-label">Source of Wealth</label>
+                  <input type="text" name="source_wealth" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Monthly Income</label>
+                  <input type="number" name="mon_income" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Annual Income</label>
+                  <input type="number" name="ann_income" class="form-control">
+                </div>
+                <!-- Company Affiliations, Bank Accounts, Public Official Relationships can be added as dynamic fields in a future step -->
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Save Customer</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
