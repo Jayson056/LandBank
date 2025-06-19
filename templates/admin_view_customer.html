@@ -338,14 +338,6 @@
         </div>
         <hr style="border: 0; border-top: 1.5px solid rgba(255, 255, 255, 0.5); margin: 10px 0 20px 0;" />
 
-        {# Flash messages for feedback after save/error #}
-        {% if get_flashed_messages(with_categories=true) %}
-            <div class="flashes">
-                {% for category, message in get_flashed_messages(with_categories=true) %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            </div>
-        {% endif %}
 
         {% if user_data.customer %}
         {# The form is kept for structure, but inputs are read-only and no submit button #}
