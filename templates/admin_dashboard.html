@@ -234,7 +234,6 @@
         }
 
         /* Table responsiveness improvements */
-        /* Removed .table-responsive for a more direct approach on widths */
         @media (max-width: 991.98px) { /* Medium devices and smaller */
             .table thead {
                 display: none; /* Hide table headers on small screens */
@@ -362,6 +361,30 @@
             max-height: 70vh;
             overflow-y: auto;
         }
+        .no-records {
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            margin-top: 1rem;
+        }
+        /* Styles for checkbox group in modal */
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #fff; /* Ensure label text is white */
+        }
+        .checkbox-group input[type="checkbox"] {
+            /* Basic styling, can be customized further */
+            width: 1.1em;
+            height: 1.1em;
+            accent-color: #00B86B; /* Green accent color */
+        }
     </style>
 </head>
 <body>
@@ -374,6 +397,7 @@
             </form>
         </div>
 
+        <!-- Search, Filter, and Actions Controls -->
         <form method="get" action="{{ url_for('admin_dashboard_page') }}" class="row g-2 align-items-end mb-4">
             <div class="col-md-4 col-12">
                 <label for="search" class="form-label visually-hidden">Search</label>
@@ -443,117 +467,143 @@
                             {% elif status == 'Inactive' %}
                             <span class="badge bg-secondary"><i class="fas fa-ban"></i> Inactive</span>
                             {% else %}
-                            <span class="badge bg-info text-dark">{{ status }}</span>
+                            <span class="badge bg-light text-dark">{{ status }}</span>
                             {% endif %}
                         </td>
                         <td data-label="Action">
                             <div class="d-flex justify-content-center align-items-center gap-1">
-                                <button class="btn btn-view btn-action shiny-btn" data-bs-toggle="modal" data-bs-target="#viewCustomerModal" data-customer-id="{{ customer.id }}" title="View Customer Details">
-                                    <i class="fas fa-eye"></i> View
-                                </button>
-                                <button class="btn btn-edit btn-action shiny-btn" data-bs-toggle="modal" data-bs-target="#editCustomerModal" data-customer-id="{{ customer.id }}" title="Edit Customer">
-                                    <i class="fas fa-edit"></i> Edit
-                                </button>
-                                <button class="btn btn-danger btn-action shiny-btn" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-customer-id="{{ customer.id }}" title="Delete Customer">
-                                    <i class="fas fa-trash-alt"></i> Delete
-                                </button>
+                                <a href="{{ url_for('admin_view_customer', cust_no=customer.cust_no) }}" class="btn btn-view btn-sm btn-action shiny-btn d-flex align-items-center">
+                                    <i class="fas fa-eye"></i> <span class="ms-1">View</span>
+                                </a>
+                                <a href="{{ url_for('admin_edit_customer', cust_no=customer.cust_no) }}" class="btn btn-edit btn-sm btn-action shiny-btn d-flex align-items-center">
+                                    <i class="fas fa-edit"></i> <span class="ms-1">Edit</span>
+                                </a>
+                                <form action="{{ url_for('delete_customer') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this customer?');" style="display:inline;">
+                                    <input type="hidden" name="cust_no" value="{{ customer.cust_no }}">
+                                    <button type="submit" class="btn btn-danger btn-sm btn-action shiny-btn d-flex align-items-center">
+                                        <i class="fas fa-trash-alt"></i> <span class="ms-1">Delete</span>
+                                    </button>
+                                </form>
                             </div>
                         </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center">No customers found.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        <nav aria-label="Page navigation">
-            <ul class="pagination justify-content-center mt-4">
-                <li class="page-item disabled"><a class="page-link" href="#" tabindex="-1">Previous</a></li>
-                <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                <li class="page-item"><a class="page-link" href="#">2</a></li>
-                <li class="page-item"><a class="page-link" href="#">3</a></li>
-                <li class="page-item"><a class="page-link" href="#">Next</a></li>
-            </ul>
-        </nav>
     </div>
 
+    <!-- Add Customer Modal -->
     <div class="modal fade" id="addCustomerModal" tabindex="-1" aria-labelledby="addCustomerModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="addCustomerModalLabel">Add New Customer</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="addCustomerForm">
-                        <h6 class="mb-3 text-white">Personal Information</h6>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-4">
-                                <label for="modal_lastName" class="form-label">Last Name</label>
-                                <input type="text" class="form-control" id="modal_lastName" name="lastName" required>
+                <form action="{{ url_for('admin_add_customer') }}" method="POST">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addCustomerModalLabel"><i class="fas fa-user-plus"></i> Add New Customer</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <!-- Personal Info -->
+                            <div class="col-12"><hr><strong>Personal Information</strong></div>
+                            <div class="col-md-6">
+                                <label class="form-label">First Name</label>
+                                <input type="text" name="firstName" class="form-control" required>
                             </div>
-                            <div class="col-md-4">
-                                <label for="modal_middleName" class="form-label">Middle Name</label>
-                                <input type="text" class="form-control" id="modal_middleName" name="middleName">
+                            <div class="col-md-6">
+                                <label class="form-label">Last Name</label>
+                                <input type="text" name="lastName" class="form-control" required>
                             </div>
-                            <div class="col-md-4">
-                                <label for="modal_firstName" class="form-label">First Name</label>
-                                <input type="text" class="form-control" id="modal_firstName" name="firstName" required>
+                            <div class="col-md-6">
+                                <label class="form-label">Date of Birth</label>
+                                <input type="date" name="datebirth" class="form-control" required>
                             </div>
-                        </div>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-4">
-                                <label for="modal_dob" class="form-label">Date of Birth</label>
-                                <input type="date" class="form-control" id="modal_dob" name="dob" required>
+                            <div class="col-md-6">
+                                <label class="form-label">Nationality</label>
+                                <input type="text" name="nationality" class="form-control" required>
                             </div>
-                            <div class="col-md-4">
-                                <label for="modal_nationality" class="form-label">Nationality</label>
-                                <input type="text" class="form-control" id="modal_nationality" name="nationality" required>
+                            <div class="col-md-6">
+                                <label class="form-label">Citizenship</label>
+                                <input type="text" name="citizenship" class="form-control" required>
                             </div>
-                            <div class="col-md-4">
-                                <label for="modal_citizenship" class="form-label">Citizenship</label>
-                                <input type="text" class="form-control" id="modal_citizenship" name="citizenship" required>
-                            </div>
-                        </div>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-4">
-                                <label for="modal_sex" class="form-label">Sex</label>
-                                <select class="form-select" id="modal_sex" name="sex" required>
-                                    <option value="" disabled selected hidden>Select Sex</option>
+                            <div class="col-md-6">
+                                <label class="form-label">Sex</label>
+                                <select name="custsex" class="form-select" required>
+                                    <option value="">Select Sex</option>
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
                                 </select>
                             </div>
-                            <div class="col-md-4">
-                                <label for="modal_civilStatus" class="form-label">Civil Status</label>
-                                <select class="form-select" id="modal_civilStatus" name="civilStatus" required>
-                                    <option value="" disabled selected hidden>Select Civil Status</option>
+                            <div class="col-md-6">
+                                <label class="form-label">Place of Birth</label>
+                                <input type="text" name="placebirth" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Civil Status</label>
+                                <select name="civilstatus" class="form-select" required>
+                                    <option value="">Select Civil Status</option>
                                     <option value="Single">Single</option>
                                     <option value="Married">Married</option>
-                                    <option value="Separated">Separated</option>
+                                    <option value="Divorced">Divorced</option>
                                     <option value="Widowed">Widowed</option>
+                                    <option value="Separated">Separated</option>
                                 </select>
                             </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Number of Children</label>
+                                <input type="number" name="num_children" class="form-control" min="0" value="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Mother's Maiden Name</label>
+                                <input type="text" name="mmaiden_name" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Address</label>
+                                <input type="text" name="cust_address" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email Address</label>
+                                <input type="email" name="email_address" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Contact No</label>
+                                <input type="tel" name="contact_no" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Registration Status</label>
+                                <select name="registration_status" class="form-select" required>
+                                    <option value="Active">Active</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+
+                            <!-- Spouse Info -->
+                            <div class="col-12"><hr><strong>Spouse Information</strong></div>
                             <div class="col-md-4">
-                                <label for="modal_contactNo" class="form-label">Contact Number</label>
-                                <input type="text" class="form-control" id="modal_contactNo" name="contactNo" required>
+                                <label class="form-label">Spouse Name</label>
+                                <input type="text" name="sp_name" class="form-control">
                             </div>
-                        </div>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label for="modal_emailAddress" class="form-label">Email Address</label>
-                                <input type="email" class="form-control" id="modal_emailAddress" name="emailAddress" required>
+                            <div class="col-md-4">
+                                <label class="form-label">Spouse Date of Birth</label>
+                                <input type="date" name="sp_datebirth" class="form-control">
                             </div>
-                            <div class="col-md-6">
-                                <label for="modal_presentAddress" class="form-label">Present Address</label>
-                                <input type="text" class="form-control" id="modal_presentAddress" name="presentAddress" required>
+                            <div class="col-md-4">
+                                <label class="form-label">Spouse Profession</label>
+                                <input type="text" name="sp_profession" class="form-control">
                             </div>
-                        </div>
-                        <hr>
-                        <h6 class="mb-3 text-white">Employment Information</h6>
-                        <div class="row g-3 mb-3">
+
+                            <!-- Employment Info -->
+                            <div class="col-12"><hr><strong>Employment Information</strong></div>
                             <div class="col-md-6">
-                                <label for="modal_occupation" class="form-label">Occupation</label>
-                                <select class="form-select" id="modal_occupation" name="occupation" required>
-                                    <option value="" disabled selected hidden>Select Occupation</option>
+                                <label class="form-label">Occupation Type</label>
+                                <select name="occ_type" id="add_occupationType" class="form-select">
+                                    <option value="">Select Occupation</option>
                                     <option value="Employed">Employed</option>
                                     <option value="Self-employed">Self-employed</option>
                                     <option value="OFW/Overseas Filipino">OFW/Overseas Filipino</option>
@@ -567,9 +617,9 @@
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label for="modal_natureOfBusiness" class="form-label">Nature of Business/Economic Activity</label>
-                                <select class="form-select" id="modal_natureOfBusiness" name="natureOfBusiness" required>
-                                    <option value="" disabled selected hidden>Select Nature of Business</option>
+                                <label class="form-label">Nature of Business/Economic Activity</label>
+                                <select name="bus_nature" id="add_natureBusiness" class="form-select">
+                                    <option value="">Select Nature of Business</option>
                                     <option value="1700">1700 - Private Household with Employed Persons</option>
                                     <option value="1800">1800 - Extra-territorial Organizations and Bodies</option>
                                     <option value="1204">1204 - Jewelry and Precious Stones Dealer</option>
@@ -603,184 +653,200 @@
                                     <option value="9220">9220 - Casinos</option>
                                 </select>
                             </div>
-                        </div>
-                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">TIN ID</label>
+                                <input type="text" name="tin_id" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Company Name</label>
+                                <input type="text" name="empname" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Employer Address</label>
+                                <input type="text" name="emp_address" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Phone/Fax No</label>
+                                <input type="tel" name="phonefax_no" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Job Title</label>
+                                <input type="text" name="job_title" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Employment Date</label>
+                                <input type="date" name="emp_date" class="form-control">
+                            </div>
+
+                            <!-- Financial Info -->
+                            <div class="col-12"><hr><strong>Financial Information</strong></div>
+                            <div class="col-12">
+                                <label class="form-label">Source of Wealth (Select up to 3)</label>
+                                <div class="checkbox-group" id="sourceOfWealthCheckboxes">
+                                    <label><input type="checkbox" name="source_wealth[]" value="Salary/Honoraria"> Salary/Honoraria</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Interest/Commission"> Interest/Commission</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Business"> Business</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Pension"> Pension</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Regular Remittance"> Regular Remittance</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Other Remittance"> Other Remittance</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Donations/Inheritance"> Donations/Inheritance</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Allowance"> Allowance</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Professional Fees - Others"> Professional Fees - Others</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Professional Fees - Lawyers/Notary/Independent"> Professional Fees - Lawyers/Notary/Independent</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Grant/Scholarship/Awards/Prizes/Benefits"> Grant/Scholarship/Awards/Prizes/Benefits</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Royalties/Commission"> Royalties/Commission</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Sale of Assets"> Sale of Assets</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Loans"> Loans</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Government Appropriations"> Government Appropriations</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Fees and Charges"> Fees and Charges</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Taxes and Licenses"> Taxes and Licenses</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Others - with documents"> Others - with documents</label>
+                                    <label><input type="checkbox" name="source_wealth[]" value="Others - without documents"> Others - without documents</label>
+                                </div>
+                            </div>
                             <div class="col-md-6">
-                                <label for="modal_monthlyIncome" class="form-label">Monthly Income</label>
-                                <select class="form-select" id="modal_monthlyIncome" name="monthlyIncome" required>
-                                    <option value="" disabled selected hidden>Select Monthly Income</option>
-                                    <option value="0_to_10000">Php 0.00-10,000.00</option>
-                                    <option value="10000_01_to_30000">Php 10,000.01-30,000.00</option>
+                                <label class="form-label">Monthly Gross Income/Pension/Allowance</label>
+                                <select name="mon_income" id="monthlyIncome" class="form-select" required>
+                                    <option value="">Select Monthly Income</option>
+                                    <option value="30000_and_below">Php 30,000.00 and below</option>
                                     <option value="30000_01_to_50000">Php 30,000.01-50,000.00</option>
                                     <option value="50000_01_to_100000">Php 50,000.01-100,000.00</option>
-                                    <option value="100000_01_to_200000">Php 100,000.01-200,000.00</option>
-                                    <option value="200000_01_to_500000">Php 200,000.01-500,000.00</option>
-                                    <option value="above_500000">Above Php 500,000.00</option>
+                                    <option value="100000_01_to_500000">Php 100,000.01-500,000.00</option>
+                                    <option value="over_500000">Over Php 500,000.00</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label for="modal_sourceOfIncome" class="form-label">Source of Income</label>
-                                <input type="text" class="form-control" id="modal_sourceOfIncome" name="sourceOfIncome" required>
+                                <label class="form-label">Annual Gross Income/Pension/Allowance</label>
+                                <select name="ann_income" id="annualIncome" class="form-select" required>
+                                    <option value="">Select Annual Income</option>
+                                    <option value="360000_and_below">Php 360,000.00 and below</option>
+                                    <option value="360000_01_to_600000">Php 360,000.01-600,000.00</option>
+                                    <option value="600000_01_to_1200000">Php 600,000.01-1,200,000.00</option>
+                                    <option value="1200000_01_to_6000000">Php 1,200,000.01-6,000,000.00</option>
+                                    <option value="over_6000000">Over Php 6,000,000.00</option>
+                                </select>
                             </div>
-                        </div>
-                        <hr>
-                        <h6 class="mb-3 text-white">Financial Information</h6>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label for="modal_fundSource" class="form-label">Fund Source</label>
-                                <input type="text" class="form-control" id="modal_fundSource" name="fundSource" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="modal_purposeOfAccount" class="form-label">Purpose of Account Opening</label>
-                                <input type="text" class="form-control" id="modal_purposeOfAccount" name="purposeOfAccount" required>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Source of Wealth (Select up to 3)</label>
-                            <div id="modal_sourceOfWealthCheckboxes" class="row">
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="modal_sourceOfWealth1" name="sourceOfWealth" value="Salary/Business Income">
-                                        <label class="form-check-label" for="modal_sourceOfWealth1">Salary/Business Income</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="modal_sourceOfWealth2" name="sourceOfWealth" value="Gift">
-                                        <label class="form-check-label" for="modal_sourceOfWealth2">Gift</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="modal_sourceOfWealth3" name="sourceOfWealth" value="Inheritance">
-                                        <label class="form-check-label" for="modal_sourceOfWealth3">Inheritance</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="modal_sourceOfWealth4" name="sourceOfWealth" value="Pension/Retirement Funds">
-                                        <label class="form-check-label" for="modal_sourceOfWealth4">Pension/Retirement Funds</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="modal_sourceOfWealth5" name="sourceOfWealth" value="Savings/Investments">
-                                        <label class="form-check-label" for="modal_sourceOfWealth5">Savings/Investments</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="modal_sourceOfWealth6" name="sourceOfWealth" value="Dividends/Interest">
-                                        <label class="form-check-label" for="modal_sourceOfWealth6">Dividends/Interest</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="modal_sourceOfWealth7" name="sourceOfWealth" value="Sale of Properties">
-                                        <label class="form-check-label" for="modal_sourceOfWealth7">Sale of Properties</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="modal_sourceOfWealth8" name="sourceOfWealth" value="Loan Proceeds">
-                                        <label class="form-check-label" for="modal_sourceOfWealth8">Loan Proceeds</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="modal_sourceOfWealth9" name="sourceOfWealth" value="Others">
-                                        <label class="form-check-label" for="modal_sourceOfWealth9">Others (Please Specify)</label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <hr>
-                        <h6 class="mb-3 text-white">Company Affiliations</h6>
-                        <div id="modal_company_affiliations_list" class="dynamic-list">
-                            <div class="row g-3 mb-2 dynamic-list-item">
-                                <div class="col-md-5">
-                                    <label for="modal_depositorRole" class="form-label">Depositor Role</label>
-                                    <input type="text" class="form-control" id="modal_depositorRole" name="depositorRole[]">
-                                </div>
-                                <div class="col-md-5">
-                                    <label for="modal_companyName" class="form-label">Company Name</label>
-                                    <input type="text" class="form-control" id="modal_companyName" name="companyName[]">
-                                </div>
-                                <div class="col-md-2 d-flex align-items-end">
-                                    <button type="button" class="btn btn-danger remove-item-btn w-100"><i class="fas fa-trash"></i></button>
-                                </div>
-                            </div>
-                            <p class="no-records-message" style="display: none;">No records listed.</p>
-                        </div>
-                        <button type="button" class="btn btn-secondary mt-2 w-100" id="addCompanyAffiliationBtn">+ Add Company Affiliation</button>
 
-                        <hr>
-                        <h6 class="mb-3 text-white">Existing Bank Accounts</h6>
-                        <div id="modal_existing_banks_list" class="dynamic-list">
-                            <div class="row g-3 mb-2 dynamic-list-item">
-                                <div class="col-md-4">
-                                    <label for="modal_bank" class="form-label">Bank</label>
-                                    <input type="text" class="form-control" id="modal_bank" name="bank[]">
+                            <!-- Company Affiliations -->
+                            <div class="col-12"><hr><strong>Company Affiliations</strong></div>
+                            <div id="modal_company_affiliations_list" class="col-12 dynamic-list">
+                                <div class="row g-2 align-items-end mb-2 dynamic-list-item">
+                                    <div class="col-md-5">
+                                        <label class="form-label">Role</label>
+                                        <input type="text" name="depositor_role[]" class="form-control" placeholder="e.g., Shareholder">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label">Company Name</label>
+                                        <input type="text" name="dep_compname[]" class="form-control" placeholder="e.g., ABC Corp">
+                                    </div>
+                                    <div class="col-md-2 d-flex justify-content-end">
+                                        <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-times"></i></button>
+                                    </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <label for="modal_branch" class="form-label">Branch</label>
-                                    <input type="text" class="form-control" id="modal_branch" name="branch[]">
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="modal_accountType" class="form-label">Account Type</label>
-                                    <input type="text" class="form-control" id="modal_accountType" name="accountType[]">
-                                </div>
-                                <div class="col-12 d-flex justify-content-end">
-                                    <button type="button" class="btn btn-danger remove-item-btn"><i class="fas fa-trash"></i></button>
-                                </div>
+                                <p class="no-records-message" style="display: none;">No records listed.</p>
                             </div>
-                            <p class="no-records-message" style="display: none;">No records listed.</p>
-                        </div>
-                        <button type="button" class="btn btn-secondary mt-2 w-100" id="addBankBtn">+ Add Bank Account</button>
-
-                        <hr>
-                        <h6 class="mb-3 text-white">Relationship to Public Official/International Organization</h6>
-                        <div id="modal_public_official_relationships_list" class="dynamic-list">
-                            <div class="row g-3 mb-2 dynamic-list-item">
-                                <div class="col-md-6">
-                                    <label for="modal_officialName" class="form-label">Name of Official</label>
-                                    <input type="text" class="form-control" id="modal_officialName" name="officialName[]">
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="modal_relationship" class="form-label">Relationship</label>
-                                    <select class="form-select" id="modal_relationship" name="relationship[]">
-                                        <option value="" disabled selected hidden>Select Relationship</option>
-                                        <option value="Spouse">Spouse</option>
-                                        <option value="Child">Child</option>
-                                        <option value="Parent">Parent</option>
-                                        <option value="Sibling">Sibling</option>
-                                        <option value="Other Relative">Other Relative</option>
-                                        <option value="Friend">Friend</option>
-                                        <option value="Business Associate">Business Associate</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="modal_position" class="form-label">Position</label>
-                                    <input type="text" class="form-control" id="modal_position" name="position[]">
-                                </div>
-                                <div class="col-12 d-flex justify-content-end">
-                                    <button type="button" class="btn btn-danger remove-item-btn"><i class="fas fa-trash"></i></button>
-                                </div>
+                            <div class="col-12 text-end">
+                                <button type="button" class="btn btn-info btn-sm shiny-btn" id="add_company_affiliation"><i class="fas fa-plus"></i> Add Affiliation</button>
                             </div>
-                            <p class="no-records-message" style="display: none;">No records listed.</p>
-                        </div>
-                        <button type="button" class="btn btn-secondary mt-2 w-100" id="addRelationshipBtn">+ Add Relationship</button>
 
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-success" form="addCustomerForm">Add Customer</button>
-                </div>
+                            <!-- Existing Bank Accounts -->
+                            <div class="col-12"><hr><strong>Existing Bank Accounts</strong></div>
+                            <div id="modal_existing_banks_list" class="col-12 dynamic-list">
+                                <div class="row g-2 align-items-end mb-2 dynamic-list-item">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Bank Name</label>
+                                        <input type="text" name="bank_name[]" class="form-control" placeholder="e.g., BPI">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Branch</label>
+                                        <input type="text" name="branch[]" class="form-control" placeholder="e.g., Makati">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Account Type</label>
+                                        <input type="text" name="acc_type[]" class="form-control" placeholder="e.g., Savings">
+                                    </div>
+                                    <div class="col-md-1 d-flex justify-content-end">
+                                        <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-times"></i></button>
+                                    </div>
+                                </div>
+                                <p class="no-records-message" style="display: none;">No records listed.</p>
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="button" class="btn btn-info btn-sm shiny-btn" id="add_existing_bank"><i class="fas fa-plus"></i> Add Bank</button>
+                            </div>
+
+                            <!-- Public Official Relationships -->
+                            <div class="col-12"><hr><strong>Public Official Relationships</strong></div>
+                            <div id="modal_public_official_relationships_list" class="col-12 dynamic-list">
+                                <div class="row g-2 align-items-end mb-2 dynamic-list-item">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Official Name</label>
+                                        <input type="text" name="gov_int_name[]" class="form-control" placeholder="e.g., Juan Dela Cruz">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Official Position</label>
+                                        <input type="text" name="official_position[]" class="form-control" placeholder="e.g., Mayor">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Branch/Org</label>
+                                        <input type="text" name="branch_orgname[]" class="form-control" placeholder="e.g., LGU Manila">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Relationship</label>
+                                        <select name="relation_desc[]" class="form-select">
+                                            <option value="">Select Relationship</option>
+                                            <option value="Father">Father</option>
+                                            <option value="Mother">Mother</option>
+                                            <option value="Mother-in- Law">Mother-in-Law</option>
+                                            <option value="Father-in-Law">Father-in-Law</option>
+                                            <option value="Son">Son</option>
+                                            <option value="Daughter">Daughter</option>
+                                            <option value="Son-in-Law">Son-in-Law</option>
+                                            <option value="Daughter-in-Law">Daughter-in-Law</option>
+                                            <option value="Brother">Brother</option>
+                                            <option value="Sister">Sister</option>
+                                            <option value="Sibling">Sibling</option>
+                                            <option value="Brother-in-Law">Brother-in-Law</option>
+                                            <option value="Sister-in-Law">Sister-in-Law</option>
+                                            <option value="Grandfather">Grandfather</option>
+                                            <option value="Grandmother">Grandmother</option>
+                                            <option value="Granddaughter">Granddaughter</option>
+                                            <option value="Grandson">Grandson</option>
+                                            <option value="Uncle">Uncle</option>
+                                            <option value="Aunt">Aunt</option>
+                                            <option value="Nephew">Nephew</option>
+                                            <option value="Niece">Niece</option>
+                                            <option value="Cousin">Cousin</option>
+                                            <option value="Spouse">Spouse</option>
+                                            <option value="Partner">Partner</option>
+                                            <option value="Guardian">Guardian</option>
+                                            <option value="Ward">Ward</option>
+                                            <option value="Other Relative">Other Relative</option>
+                                            <option value="Friend">Friend</option>
+                                            <option value="Business Associate">Business Associate</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-1 d-flex justify-content-end">
+                                        <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-times"></i></button>
+                                    </div>
+                                </div>
+                                <p class="no-records-message" style="display: none;">No records listed.</p>
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="button" class="btn btn-info btn-sm shiny-btn" id="add_public_official_relationship"><i class="fas fa-plus"></i> Add PO Relationship</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary shiny-btn" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success shiny-btn"><i class="fas fa-save"></i> Save Customer</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
+    <!-- View Customer Modal (Existing, keeping as is) -->
     <div class="modal fade" id="viewCustomerModal" tabindex="-1" aria-labelledby="viewCustomerModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
@@ -789,6 +855,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <!-- Customer details will be loaded here via JavaScript -->
                     <div id="customerDetailsContent">
                         <h6 class="mb-3 text-white">Personal Information</h6>
                         <div class="row g-3 mb-3">
@@ -843,6 +910,7 @@
         </div>
     </div>
 
+    <!-- Edit Customer Modal (Existing, keeping as is, but field names adjusted) -->
     <div class="modal fade" id="editCustomerModal" tabindex="-1" aria-labelledby="editCustomerModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
@@ -856,23 +924,19 @@
                         <h6 class="mb-3 text-white">Personal Information</h6>
                         <div class="row g-3 mb-3">
                             <div class="col-md-4">
+                                <label for="edit_firstName" class="form-label">First Name</label>
+                                <input type="text" class="form-control" id="edit_firstName" name="firstName" required>
+                            </div>
+                            <div class="col-md-4">
                                 <label for="edit_lastName" class="form-label">Last Name</label>
                                 <input type="text" class="form-control" id="edit_lastName" name="lastName" required>
                             </div>
                             <div class="col-md-4">
-                                <label for="edit_middleName" class="form-label">Middle Name</label>
-                                <input type="text" class="form-control" id="edit_middleName" name="middleName">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="edit_firstName" class="form-label">First Name</label>
-                                <input type="text" class="form-control" id="edit_firstName" name="firstName" required>
+                                <label for="edit_datebirth" class="form-label">Date of Birth</label>
+                                <input type="date" class="form-control" id="edit_datebirth" name="datebirth" required>
                             </div>
                         </div>
                         <div class="row g-3 mb-3">
-                            <div class="col-md-4">
-                                <label for="edit_dob" class="form-label">Date of Birth</label>
-                                <input type="date" class="form-control" id="edit_dob" name="dob" required>
-                            </div>
                             <div class="col-md-4">
                                 <label for="edit_nationality" class="form-label">Nationality</label>
                                 <input type="text" class="form-control" id="edit_nationality" name="nationality" required>
@@ -881,48 +945,90 @@
                                 <label for="edit_citizenship" class="form-label">Citizenship</label>
                                 <input type="text" class="form-control" id="edit_citizenship" name="citizenship" required>
                             </div>
-                        </div>
-                        <div class="row g-3 mb-3">
                             <div class="col-md-4">
-                                <label for="edit_sex" class="form-label">Sex</label>
-                                <select class="form-select" id="edit_sex" name="sex" required>
-                                    <option value="" disabled selected hidden>Select Sex</option>
+                                <label for="edit_custsex" class="form-label">Sex</label>
+                                <select class="form-select" id="edit_custsex" name="custsex" required>
+                                    <option value="">Select Sex</option>
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
                                 </select>
                             </div>
+                        </div>
+                        <div class="row g-3 mb-3">
                             <div class="col-md-4">
-                                <label for="edit_civilStatus" class="form-label">Civil Status</label>
-                                <select class="form-select" id="edit_civilStatus" name="civilStatus" required>
-                                    <option value="" disabled selected hidden>Select Civil Status</option>
+                                <label for="edit_placebirth" class="form-label">Place of Birth</label>
+                                <input type="text" class="form-control" id="edit_placebirth" name="placebirth" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_civilstatus" class="form-label">Civil Status</label>
+                                <select class="form-select" id="edit_civilstatus" name="civilstatus" required>
+                                    <option value="">Select Civil Status</option>
                                     <option value="Single">Single</option>
                                     <option value="Married">Married</option>
-                                    <option value="Separated">Separated</option>
+                                    <option value="Divorced">Divorced</option>
                                     <option value="Widowed">Widowed</option>
+                                    <option value="Separated">Separated</option>
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label for="edit_contactNo" class="form-label">Contact Number</label>
-                                <input type="text" class="form-control" id="edit_contactNo" name="contactNo" required>
+                                <label for="edit_num_children" class="form-label">Number of Children</label>
+                                <input type="number" class="form-control" id="edit_num_children" name="num_children" min="0">
                             </div>
                         </div>
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
-                                <label for="edit_emailAddress" class="form-label">Email Address</label>
-                                <input type="email" class="form-control" id="edit_emailAddress" name="emailAddress" required>
+                                <label for="edit_mmaiden_name" class="form-label">Mother's Maiden Name</label>
+                                <input type="text" class="form-control" id="edit_mmaiden_name" name="mmaiden_name" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="edit_presentAddress" class="form-label">Present Address</label>
-                                <input type="text" class="form-control" id="edit_presentAddress" name="presentAddress" required>
+                                <label for="edit_cust_address" class="form-label">Address</label>
+                                <input type="text" class="form-control" id="edit_cust_address" name="cust_address" required>
                             </div>
                         </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="edit_email_address" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="edit_email_address" name="email_address" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_contact_no" class="form-label">Contact No</label>
+                                <input type="tel" class="form-control" id="edit_contact_no" name="contact_no" required>
+                            </div>
+                        </div>
+                         <div class="col-md-6">
+                            <label for="edit_registration_status" class="form-label">Registration Status</label>
+                            <select name="registration_status" id="edit_registration_status" class="form-select" required>
+                                <option value="Active">Active</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                        </div>
+
+                        <hr>
+                        <h6 class="mb-3 text-white">Spouse Information</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label for="edit_sp_name" class="form-label">Spouse Name</label>
+                                <input type="text" id="edit_sp_name" name="sp_name" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sp_datebirth" class="form-label">Spouse Date of Birth</label>
+                                <input type="date" id="edit_sp_datebirth" name="sp_datebirth" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sp_profession" class="form-label">Spouse Profession</label>
+                                <input type="text" id="edit_sp_profession" name="sp_profession" class="form-control">
+                            </div>
+                        </div>
+
                         <hr>
                         <h6 class="mb-3 text-white">Employment Information</h6>
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
-                                <label for="edit_occupation" class="form-label">Occupation</label>
-                                <select class="form-select" id="edit_occupation" name="occupation" required>
-                                    <option value="" disabled selected hidden>Select Occupation</option>
+                                <label for="edit_occ_type" class="form-label">Occupation Type</label>
+                                <select name="occ_type" id="edit_occ_type" class="form-select">
+                                    <option value="">Select Occupation</option>
                                     <option value="Employed">Employed</option>
                                     <option value="Self-employed">Self-employed</option>
                                     <option value="OFW/Overseas Filipino">OFW/Overseas Filipino</option>
@@ -936,9 +1042,9 @@
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label for="edit_natureOfBusiness" class="form-label">Nature of Business/Economic Activity</label>
-                                <select class="form-select" id="edit_natureOfBusiness" name="natureOfBusiness" required>
-                                    <option value="" disabled selected hidden>Select Nature of Business</option>
+                                <label for="edit_bus_nature" class="form-label">Nature of Business/Economic Activity</label>
+                                <select name="bus_nature" id="edit_bus_nature" class="form-select">
+                                    <option value="">Select Nature of Business</option>
                                     <option value="1700">1700 - Private Household with Employed Persons</option>
                                     <option value="1800">1800 - Extra-territorial Organizations and Bodies</option>
                                     <option value="1204">1204 - Jewelry and Precious Stones Dealer</option>
@@ -974,123 +1080,122 @@
                             </div>
                         </div>
                         <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label for="edit_monthlyIncome" class="form-label">Monthly Income</label>
-                                <select class="form-select" id="edit_monthlyIncome" name="monthlyIncome" required>
-                                    <option value="" disabled selected hidden>Select Monthly Income</option>
-                                    <option value="0_to_10000">Php 0.00-10,000.00</option>
-                                    <option value="10000_01_to_30000">Php 10,000.01-30,000.00</option>
-                                    <option value="30000_01_to_50000">Php 30,000.01-50,000.00</option>
-                                    <option value="50000_01_to_100000">Php 50,000.01-100,000.00</option>
-                                    <option value="100000_01_to_200000">Php 100,000.01-200,000.00</option>
-                                    <option value="200000_01_to_500000">Php 200,000.01-500,000.00</option>
-                                    <option value="above_500000">Above Php 500,000.00</option>
-                                </select>
+                            <div class="col-md-4">
+                                <label for="edit_tin_id" class="form-label">TIN ID</label>
+                                <input type="text" name="tin_id" class="form-control" id="edit_tin_id">
                             </div>
-                            <div class="col-md-6">
-                                <label for="edit_sourceOfIncome" class="form-label">Source of Income</label>
-                                <input type="text" class="form-control" id="edit_sourceOfIncome" name="sourceOfIncome" required>
+                            <div class="col-md-4">
+                                <label for="edit_empname" class="form-label">Company Name</label>
+                                <input type="text" name="empname" class="form-control" id="edit_empname">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_emp_address" class="form-label">Employer Address</label>
+                                <input type="text" name="emp_address" class="form-control" id="edit_emp_address">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_phonefax_no" class="form-label">Phone/Fax No</label>
+                                <input type="tel" name="phonefax_no" class="form-control" id="edit_phonefax_no">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_job_title" class="form-label">Job Title</label>
+                                <input type="text" name="job_title" class="form-control" id="edit_job_title">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_emp_date" class="form-label">Employment Date</label>
+                                <input type="date" name="emp_date" class="form-control" id="edit_emp_date">
                             </div>
                         </div>
+
                         <hr>
                         <h6 class="mb-3 text-white">Financial Information</h6>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label for="edit_fundSource" class="form-label">Fund Source</label>
-                                <input type="text" class="form-control" id="edit_fundSource" name="fundSource" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="edit_purposeOfAccount" class="form-label">Purpose of Account Opening</label>
-                                <input type="text" class="form-control" id="edit_purposeOfAccount" name="purposeOfAccount" required>
-                            </div>
-                        </div>
-                        <div class="mb-3">
+                        <div class="col-12">
                             <label class="form-label">Source of Wealth (Select up to 3)</label>
-                            <div id="edit_sourceOfWealthCheckboxes" class="row">
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="edit_sourceOfWealth1" name="sourceOfWealth" value="Salary/Business Income">
-                                        <label class="form-check-label" for="edit_sourceOfWealth1">Salary/Business Income</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="edit_sourceOfWealth2" name="sourceOfWealth" value="Gift">
-                                        <label class="form-check-label" for="edit_sourceOfWealth2">Gift</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="edit_sourceOfWealth3" name="sourceOfWealth" value="Inheritance">
-                                        <label class="form-check-label" for="edit_sourceOfWealth3">Inheritance</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="edit_sourceOfWealth4" name="sourceOfWealth" value="Pension/Retirement Funds">
-                                        <label class="form-check-label" for="edit_sourceOfWealth4">Pension/Retirement Funds</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="edit_sourceOfWealth5" name="sourceOfWealth" value="Savings/Investments">
-                                        <label class="form-check-label" for="edit_sourceOfWealth5">Savings/Investments</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="edit_sourceOfWealth6" name="sourceOfWealth" value="Dividends/Interest">
-                                        <label class="form-check-label" for="edit_sourceOfWealth6">Dividends/Interest</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="edit_sourceOfWealth7" name="sourceOfWealth" value="Sale of Properties">
-                                        <label class="form-check-label" for="edit_sourceOfWealth7">Sale of Properties</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="edit_sourceOfWealth8" name="sourceOfWealth" value="Loan Proceeds">
-                                        <label class="form-check-label" for="edit_sourceOfWealth8">Loan Proceeds</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" id="edit_sourceOfWealth9" name="sourceOfWealth" value="Others">
-                                        <label class="form-check-label" for="edit_sourceOfWealth9">Others (Please Specify)</label>
-                                    </div>
-                                </div>
+                            <div class="checkbox-group" id="editSourceOfWealthCheckboxes">
+                                <label><input type="checkbox" name="source_wealth[]" value="Salary/Honoraria"> Salary/Honoraria</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Interest/Commission"> Interest/Commission</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Business"> Business</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Pension"> Pension</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Regular Remittance"> Regular Remittance</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Other Remittance"> Other Remittance</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Donations/Inheritance"> Donations/Inheritance</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Allowance"> Allowance</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Professional Fees - Others"> Professional Fees - Others</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Professional Fees - Lawyers/Notary/Independent"> Professional Fees - Lawyers/Notary/Independent</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Grant/Scholarship/Awards/Prizes/Benefits"> Grant/Scholarship/Awards/Prizes/Benefits</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Royalties/Commission"> Royalties/Commission</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Sale of Assets"> Sale of Assets</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Loans"> Loans</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Government Appropriations"> Government Appropriations</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Fees and Charges"> Fees and Charges</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Taxes and Licenses"> Taxes and Licenses</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Others - with documents"> Others - with documents</label>
+                                <label><input type="checkbox" name="source_wealth[]" value="Others - without documents"> Others - without documents</label>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <label for="edit_mon_income" class="form-label">Monthly Gross Income/Pension/Allowance</label>
+                            <select name="mon_income" id="edit_mon_income" class="form-select" required>
+                                <option value="">Select Monthly Income</option>
+                                <option value="30000_and_below">Php 30,000.00 and below</option>
+                                <option value="30000_01_to_50000">Php 30,000.01-50,000.00</option>
+                                <option value="50000_01_to_100000">Php 50,000.01-100,000.00</option>
+                                <option value="100000_01_to_500000">Php 100,000.01-500,000.00</option>
+                                <option value="over_500000">Over Php 500,000.00</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_ann_income" class="form-label">Annual Gross Income/Pension/Allowance</label>
+                            <select name="ann_income" id="edit_ann_income" class="form-select" required>
+                                <option value="">Select Annual Income</option>
+                                <option value="360000_and_below">Php 360,000.00 and below</option>
+                                <option value="360000_01_to_600000">Php 360,000.01-600,000.00</option>
+                                <option value="600000_01_to_1200000">Php 600,000.01-1,200,000.00</option>
+                                <option value="1200000_01_to_6000000">Php 1,200,000.01-6,000,000.00</option>
+                                <option value="over_6000000">Over Php 6,000,000.00</option>
+                            </select>
+                        </div>
+
                         <hr>
                         <h6 class="mb-3 text-white">Company Affiliations</h6>
-                        <div id="edit_company_affiliations_list" class="dynamic-list">
+                        <div id="edit_company_affiliations_list" class="col-12 dynamic-list">
+                            <!-- Dynamic items will be loaded here -->
+                            <p class="no-records-message" style="display: none;">No records listed.</p>
                         </div>
-                        <button type="button" class="btn btn-secondary mt-2 w-100" id="editCompanyAffiliationBtn">+ Add Company Affiliation</button>
+                        <div class="col-12 text-end">
+                            <button type="button" class="btn btn-info btn-sm shiny-btn" id="edit_add_company_affiliation"><i class="fas fa-plus"></i> Add Affiliation</button>
+                        </div>
 
                         <hr>
                         <h6 class="mb-3 text-white">Existing Bank Accounts</h6>
-                        <div id="edit_existing_banks_list" class="dynamic-list">
+                        <div id="edit_existing_banks_list" class="col-12 dynamic-list">
+                            <!-- Dynamic items will be loaded here -->
+                            <p class="no-records-message" style="display: none;">No records listed.</p>
                         </div>
-                        <button type="button" class="btn btn-secondary mt-2 w-100" id="editBankBtn">+ Add Bank Account</button>
+                        <div class="col-12 text-end">
+                            <button type="button" class="btn btn-info btn-sm shiny-btn" id="edit_add_existing_bank"><i class="fas fa-plus"></i> Add Bank</button>
+                        </div>
 
                         <hr>
-                        <h6 class="mb-3 text-white">Relationship to Public Official/International Organization</h6>
-                        <div id="edit_public_official_relationships_list" class="dynamic-list">
+                        <h6 class="mb-3 text-white">Public Official Relationships</h6>
+                        <div id="edit_public_official_relationships_list" class="col-12 dynamic-list">
+                            <!-- Dynamic items will be loaded here -->
+                            <p class="no-records-message" style="display: none;">No records listed.</p>
                         </div>
-                        <button type="button" class="btn btn-secondary mt-2 w-100" id="editRelationshipBtn">+ Add Relationship</button>
+                        <div class="col-12 text-end">
+                            <button type="button" class="btn btn-info btn-sm shiny-btn" id="edit_add_public_official_relationship"><i class="fas fa-plus"></i> Add PO Relationship</button>
+                        </div>
 
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-success" form="editCustomerForm">Save Changes</button>
+                    <button type="button" class="btn btn-secondary shiny-btn" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary shiny-btn" form="editCustomerForm"><i class="fas fa-save"></i> Save Changes</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Delete Customer Confirmation Modal -->
     <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -1099,13 +1204,13 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    Are you sure you want to delete this customer and all associated records? This action cannot be undone.
+                    Are you sure you want to delete this customer record? This action cannot be undone.
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <form id="deleteCustomerForm" method="POST" action="">
-                        <input type="hidden" id="delete_customerId" name="customerId">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger">Delete Customer</button>
+                        <input type="hidden" name="cust_no" id="delete_customerId">
+                        <button type="submit" class="btn btn-danger">Delete</button>
                     </form>
                 </div>
             </div>
@@ -1116,138 +1221,191 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Function to check if a dynamic list is empty and show/hide message
-            function checkAndAddNoRecordsMessage(listElement) {
-                const noRecordsMessage = listElement.querySelector('.no-records-message');
-                if (listElement.querySelectorAll('.dynamic-list-item').length === 0) {
-                    if (noRecordsMessage) noRecordsMessage.style.display = 'block';
+            // Function to add a new item to a dynamic list
+            function addDynamicListItem(listId, templateHtml) {
+                const listContainer = document.getElementById(listId);
+                const newItemDiv = document.createElement('div');
+                newItemDiv.innerHTML = templateHtml;
+                newItemDiv.classList.add('row', 'g-2', 'align-items-end', 'mb-2', 'dynamic-list-item');
+                
+                // Add remove button event listener
+                newItemDiv.querySelector('.remove-item-btn').addEventListener('click', function() {
+                    newItemDiv.remove();
+                    checkAndAddNoRecordsMessage(listContainer);
+                });
+
+                // Remove "No records listed." message if present
+                const noRecordsMessage = listContainer.querySelector('.no-records-message');
+                if (noRecordsMessage) {
+                    noRecordsMessage.style.display = 'none';
+                }
+
+                listContainer.appendChild(newItemDiv);
+                checkAndAddNoRecordsMessage(listContainer); // Re-check after adding
+            }
+
+            // Function to check if a list is empty and show/hide "No records" message
+            function checkAndAddNoRecordsMessage(listContainer) {
+                const items = listContainer.querySelectorAll('.dynamic-list-item');
+                let noRecordsMessage = listContainer.querySelector('.no-records-message');
+
+                if (!noRecordsMessage) {
+                    noRecordsMessage = document.createElement('p');
+                    noRecordsMessage.className = 'no-records-message';
+                    noRecordsMessage.textContent = 'No records listed.';
+                    listContainer.appendChild(noRecordsMessage);
+                }
+
+                if (items.length === 0) {
+                    noRecordsMessage.style.display = 'block';
                 } else {
-                    if (noRecordsMessage) noRecordsMessage.style.display = 'none';
+                    noRecordsMessage.style.display = 'none';
                 }
             }
+
+
+            // Templates for new dynamic list items (matching your Python backend's expected name attributes)
+            const companyAffiliationTemplate = `
+                <div class="col-md-5">
+                    <label class="form-label">Role</label>
+                    <input type="text" name="depositor_role[]" class="form-control" placeholder="e.g., Shareholder">
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Company Name</label>
+                    <input type="text" name="dep_compname[]" class="form-control" placeholder="e.g., ABC Corp">
+                </div>
+                <div class="col-md-2 d-flex justify-content-end">
+                    <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+
+            const existingBankTemplate = `
+                <div class="col-md-4">
+                    <label class="form-label">Bank Name</label>
+                    <input type="text" name="bank_name[]" class="form-control" placeholder="e.g., BPI">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Branch</label>
+                    <input type="text" name="branch[]" class="form-control" placeholder="e.g., Makati">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Account Type</label>
+                    <input type="text" name="acc_type[]" class="form-control" placeholder="e.g., Savings">
+                </div>
+                <div class="col-md-1 d-flex justify-content-end">
+                    <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+
+            const publicOfficialRelationshipTemplate = `
+                <div class="col-md-3">
+                    <label class="form-label">Official Name</label>
+                    <input type="text" name="gov_int_name[]" class="form-control" placeholder="e.g., Juan Dela Cruz">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Official Position</label>
+                    <input type="text" name="official_position[]" class="form-control" placeholder="e.g., Mayor">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Branch/Org</label>
+                    <input type="text" name="branch_orgname[]" class="form-control" placeholder="e.g., LGU Manila">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Relationship</label>
+                    <select name="relation_desc[]" class="form-select">
+                        <option value="">Select Relationship</option>
+                        <option value="Father">Father</option>
+                        <option value="Mother">Mother</option>
+                        <option value="Mother-in- Law">Mother-in-Law</option>
+                        <option value="Father-in-Law">Father-in-Law</option>
+                        <option value="Son">Son</option>
+                        <option value="Daughter">Daughter</option>
+                        <option value="Son-in-Law">Son-in-Law</option>
+                        <option value="Daughter-in-Law">Daughter-in-Law</option>
+                        <option value="Brother">Brother</option>
+                        <option value="Sister">Sister</option>
+                        <option value="Sibling">Sibling</option>
+                        <option value="Brother-in-Law">Brother-in-Law</option>
+                        <option value="Sister-in-Law">Sister-in-Law</option>
+                        <option value="Grandfather">Grandfather</option>
+                        <option value="Grandmother">Grandmother</option>
+                        <option value="Granddaughter">Granddaughter</option>
+                        <option value="Grandson">Grandson</option>
+                        <option value="Uncle">Uncle</option>
+                        <option value="Aunt">Aunt</option>
+                        <option value="Nephew">Nephew</option>
+                        <option value="Niece">Niece</option>
+                        <option value="Cousin">Cousin</option>
+                        <option value="Spouse">Spouse</option>
+                        <option value="Partner">Partner</option>
+                        <option value="Guardian">Guardian</option>
+                        <option value="Ward">Ward</option>
+                        <option value="Other Relative">Other Relative</option>
+                        <option value="Friend">Friend</option>
+                        <option value="Business Associate">Business Associate</option>
+                    </select>
+                </div>
+                <div class="col-md-1 d-flex justify-content-end">
+                    <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-times"></i></button>
+                </div>
+            `;
 
             // --- Add Customer Modal Dynamic Fields ---
             const addCustomerModal = document.getElementById('addCustomerModal');
             if (addCustomerModal) {
-                const companyAffiliationList = document.getElementById('modal_company_affiliations_list');
-                const addCompanyAffiliationBtn = document.getElementById('addCompanyAffiliationBtn');
-                const bankList = document.getElementById('modal_existing_banks_list');
-                const addBankBtn = document.getElementById('addBankBtn');
-                const relationshipList = document.getElementById('modal_public_official_relationships_list');
-                const addRelationshipBtn = document.getElementById('addRelationshipBtn');
-
-                // Initial check for 'No records listed.' messages
-                checkAndAddNoRecordsMessage(companyAffiliationList);
-                checkAndAddNoRecordsMessage(bankList);
-                checkAndAddNoRecordsMessage(relationshipList);
+                // Initial check for 'No records listed.' messages on modal open
+                addCustomerModal.addEventListener('show.bs.modal', function() {
+                    checkAndAddNoRecordsMessage(document.getElementById('modal_company_affiliations_list'));
+                    checkAndAddNoRecordsMessage(document.getElementById('modal_existing_banks_list'));
+                    checkAndAddNoRecordsMessage(document.getElementById('modal_public_official_relationships_list'));
+                });
 
                 // Add Company Affiliation
-                addCompanyAffiliationBtn.addEventListener('click', function() {
-                    const newItem = document.createElement('div');
-                    newItem.className = 'row g-3 mb-2 dynamic-list-item';
-                    newItem.innerHTML = `
-                        <div class="col-md-5">
-                            <label for="modal_depositorRole_new" class="form-label">Depositor Role</label>
-                            <input type="text" class="form-control" name="depositorRole[]" id="modal_depositorRole_new_${Date.now()}">
-                        </div>
-                        <div class="col-md-5">
-                            <label for="modal_companyName_new" class="form-label">Company Name</label>
-                            <input type="text" class="form-control" name="companyName[]" id="modal_companyName_new_${Date.now()}">
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button type="button" class="btn btn-danger remove-item-btn w-100"><i class="fas fa-trash"></i></button>
-                        </div>
-                    `;
-                    companyAffiliationList.appendChild(newItem);
-                    checkAndAddNoRecordsMessage(companyAffiliationList);
-                    // Add event listener for the new remove button
-                    newItem.querySelector('.remove-item-btn').addEventListener('click', function() {
-                        newItem.remove();
-                        checkAndAddNoRecordsMessage(companyAffiliationList);
-                    });
+                document.getElementById('add_company_affiliation').addEventListener('click', function() {
+                    addDynamicListItem('modal_company_affiliations_list', companyAffiliationTemplate);
                 });
 
                 // Add Bank Account
-                addBankBtn.addEventListener('click', function() {
-                    const newItem = document.createElement('div');
-                    newItem.className = 'row g-3 mb-2 dynamic-list-item';
-                    newItem.innerHTML = `
-                        <div class="col-md-4">
-                            <label for="modal_bank_new" class="form-label">Bank</label>
-                            <input type="text" class="form-control" name="bank[]" id="modal_bank_new_${Date.now()}">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="modal_branch_new" class="form-label">Branch</label>
-                            <input type="text" class="form-control" name="branch[]" id="modal_branch_new_${Date.now()}">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="modal_accountType_new" class="form-label">Account Type</label>
-                            <input type="text" class="form-control" name="accountType[]" id="modal_accountType_new_${Date.now()}">
-                        </div>
-                        <div class="col-12 d-flex justify-content-end">
-                            <button type="button" class="btn btn-danger remove-item-btn"><i class="fas fa-trash"></i></button>
-                        </div>
-                    `;
-                    bankList.appendChild(newItem);
-                    checkAndAddNoRecordsMessage(bankList);
-                    // Add event listener for the new remove button
-                    newItem.querySelector('.remove-item-btn').addEventListener('click', function() {
-                        newItem.remove();
-                        checkAndAddNoRecordsMessage(bankList);
-                    });
+                document.getElementById('add_existing_bank').addEventListener('click', function() {
+                    addDynamicListItem('modal_existing_banks_list', existingBankTemplate);
                 });
 
                 // Add Relationship to Public Official
-                addRelationshipBtn.addEventListener('click', function() {
-                    const newItem = document.createElement('div');
-                    newItem.className = 'row g-3 mb-2 dynamic-list-item';
-                    newItem.innerHTML = `
-                        <div class="col-md-6">
-                            <label for="modal_officialName_new" class="form-label">Name of Official</label>
-                            <input type="text" class="form-control" name="officialName[]" id="modal_officialName_new_${Date.now()}">
-                        </div>
-                        <div class="col-md-6">
-                            <label for="modal_relationship_new" class="form-label">Relationship</label>
-                            <select class="form-select" name="relationship[]" id="modal_relationship_new_${Date.now()}">
-                                <option value="" disabled selected hidden>Select Relationship</option>
-                                <option value="Spouse">Spouse</option>
-                                <option value="Child">Child</option>
-                                <option value="Parent">Parent</option>
-                                <option value="Sibling">Sibling</option>
-                                <option value="Other Relative">Other Relative</option>
-                                <option value="Friend">Friend</option>
-                                <option value="Business Associate">Business Associate</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="modal_position_new" class="form-label">Position</label>
-                            <input type="text" class="form-control" name="position[]" id="modal_position_new_${Date.now()}">
-                        </div>
-                        <div class="col-12 d-flex justify-content-end">
-                            <button type="button" class="btn btn-danger remove-item-btn"><i class="fas fa-trash"></i></button>
-                        </div>
-                    `;
-                    relationshipList.appendChild(newItem);
-                    checkAndAddNoRecordsMessage(relationshipList);
-                    // Add event listener for the new remove button
-                    newItem.querySelector('.remove-item-btn').addEventListener('click', function() {
-                        newItem.remove();
-                        checkAndAddNoRecordsMessage(relationshipList);
-                    });
+                document.getElementById('add_public_official_relationship').addEventListener('click', function() {
+                    addDynamicListItem('modal_public_official_relationships_list', publicOfficialRelationshipTemplate);
                 });
 
                 // Source of Wealth Checkbox Limit for Add Customer Modal
-                const addSourceOfWealthCheckboxes = document.querySelectorAll('#modal_sourceOfWealthCheckboxes input[type="checkbox"]');
-                addSourceOfWealthCheckboxes.forEach(checkbox => {
-                    checkbox.addEventListener('change', function(event) {
-                        if (event.target.name === 'sourceOfWealth' && event.target.type === 'checkbox') {
-                            const checkedCount = addCustomerModal.querySelectorAll('input[name="sourceOfWealth"]:checked').length;
-                            if (checkedCount > 3) {
-                                event.target.checked = false;
-                                alert('You can select up to three sources of wealth only.');
+                addCustomerModal.addEventListener('change', function(event) {
+                    if (event.target.name === 'source_wealth[]' && event.target.type === 'checkbox') {
+                        const checkedCount = addCustomerModal.querySelectorAll('input[name="source_wealth[]"]:checked').length;
+                        if (checkedCount > 3) {
+                            event.target.checked = false;
+                            // Provide user feedback without using alert()
+                            let messageContainer = addCustomerModal.querySelector('#sourceOfWealthMessage');
+                            if (!messageContainer) {
+                                const parentDiv = event.target.closest('.checkbox-group');
+                                if (parentDiv) {
+                                    messageContainer = document.createElement('div');
+                                    messageContainer.id = 'sourceOfWealthMessage';
+                                    messageContainer.classList.add('text-warning', 'mt-2'); // Bootstrap classes for warning text
+                                    parentDiv.parentNode.appendChild(messageContainer);
+                                }
+                            }
+                            if (messageContainer) {
+                                messageContainer.textContent = 'You can select up to three sources of wealth only.';
+                                setTimeout(() => {
+                                    messageContainer.textContent = ''; // Clear message after 3 seconds
+                                }, 3000);
+                            }
+                        } else {
+                            // Clear message if count is <= 3
+                            const messageContainer = addCustomerModal.querySelector('#sourceOfWealthMessage');
+                            if (messageContainer) {
+                                messageContainer.textContent = '';
                             }
                         }
-                    });
+                    }
                 });
             }
 
@@ -1256,75 +1414,108 @@
             if (viewCustomerModal) {
                 viewCustomerModal.addEventListener('show.bs.modal', function (event) {
                     const button = event.relatedTarget; // Button that triggered the modal
-                    const customerId = button.getAttribute('data-customer-id'); // Extract info from data-* attributes
+                    // In your Flask app, you will need an endpoint like /api/customer/<uuid:cust_no>
+                    // that returns JSON data for a specific customer.
+                    const customerId = button.getAttribute('data-customer-id'); 
 
-                    // Fetch customer data using an API call (example: /api/customers/<id>)
-                    fetch(`/api/customer/${customerId}`)
-                        .then(response => response.json())
+                    fetch(`/admin/customer/${customerId}`) // Assuming this Flask route exists and returns JSON
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.json();
+                        })
                         .then(data => {
                             // Populate personal info fields
-                            document.getElementById('view_lastName').textContent = data.lastName || 'N/A';
-                            document.getElementById('view_middleName').textContent = data.middleName || 'N/A';
-                            document.getElementById('view_firstName').textContent = data.firstName || 'N/A';
-                            document.getElementById('view_dob').textContent = data.dob || 'N/A';
-                            document.getElementById('view_nationality').textContent = data.nationality || 'N/A';
-                            document.getElementById('view_citizenship').textContent = data.citizenship || 'N/A';
-                            document.getElementById('view_sex').textContent = data.sex || 'N/A';
-                            document.getElementById('view_civilStatus').textContent = data.civilStatus || 'N/A';
-                            document.getElementById('view_contactNo').textContent = data.contactNo || 'N/A';
-                            document.getElementById('view_emailAddress').textContent = data.emailAddress || 'N/A';
-                            document.getElementById('view_presentAddress').textContent = data.presentAddress || 'N/A';
+                            // Assuming your customer_data from Flask populates these fields directly
+                            document.getElementById('view_firstName').textContent = data.customer.custname.split(' ')[0] || 'N/A';
+                            document.getElementById('view_lastName').textContent = data.customer.custname.split(' ')[1] || 'N/A';
+                            document.getElementById('view_dob').textContent = data.customer.datebirth || 'N/A';
+                            document.getElementById('view_nationality').textContent = data.customer.nationality || 'N/A';
+                            document.getElementById('view_citizenship').textContent = data.customer.citizenship || 'N/A';
+                            document.getElementById('view_sex').textContent = data.customer.custsex || 'N/A';
+                            document.getElementById('view_civilStatus').textContent = data.customer.civilstatus || 'N/A';
+                            document.getElementById('view_contactNo').textContent = data.customer.contact_no || 'N/A';
+                            document.getElementById('view_emailAddress').textContent = data.customer.email_address || 'N/A';
+                            document.getElementById('view_presentAddress').textContent = data.customer.cust_address || 'N/A';
+                            document.getElementById('view_num_children').textContent = data.customer.num_children || '0';
+                            document.getElementById('view_mmaiden_name').textContent = data.customer.mmaiden_name || 'N/A';
 
                             // Populate employment info fields
-                            document.getElementById('view_occupation').textContent = data.occupation || 'N/A';
-                            document.getElementById('view_natureOfBusiness').textContent = data.natureOfBusiness || 'N/A';
-                            document.getElementById('view_monthlyIncome').textContent = data.monthlyIncome || 'N/A';
-                            document.getElementById('view_sourceOfIncome').textContent = data.sourceOfIncome || 'N/A';
+                            document.getElementById('view_occupation').textContent = data.occupation.occ_type || 'N/A';
+                            document.getElementById('view_natureOfBusiness').textContent = data.occupation.bus_nature || 'N/A';
+                            
+                            // Employer details if applicable
+                            if (data.employer_details) {
+                                document.getElementById('view_tin_id').textContent = data.employer_details.tin_id || 'N/A';
+                                document.getElementById('view_empname').textContent = data.employer_details.empname || 'N/A';
+                                document.getElementById('view_emp_address').textContent = data.employer_details.emp_address || 'N/A';
+                                document.getElementById('view_phonefax_no').textContent = data.employer_details.phonefax_no || 'N/A';
+                                document.getElementById('view_job_title').textContent = data.employer_details.job_title || 'N/A';
+                                document.getElementById('view_emp_date').textContent = data.employer_details.emp_date || 'N/A';
+                            } else {
+                                // Clear if not employed or no data
+                                document.getElementById('view_tin_id').textContent = 'N/A';
+                                document.getElementById('view_empname').textContent = 'N/A';
+                                document.getElementById('view_emp_address').textContent = 'N/A';
+                                document.getElementById('view_phonefax_no').textContent = 'N/A';
+                                document.getElementById('view_job_title').textContent = 'N/A';
+                                document.getElementById('view_emp_date').textContent = 'N/A';
+                            }
 
                             // Populate financial info fields
-                            document.getElementById('view_fundSource').textContent = data.fundSource || 'N/A';
-                            document.getElementById('view_purposeOfAccount').textContent = data.purposeOfAccount || 'N/A';
-                            document.getElementById('view_sourceOfWealth').textContent = (data.sourceOfWealth && data.sourceOfWealth.length > 0) ? data.sourceOfWealth.join(', ') : 'N/A';
+                            document.getElementById('view_sourceOfWealth').textContent = data.financial_record.source_wealth || 'N/A';
+                            document.getElementById('view_monthlyIncome').textContent = data.financial_record.mon_income || 'N/A';
+                            document.getElementById('view_annualIncome').textContent = data.financial_record.ann_income || 'N/A';
 
-                            // Clear existing dynamic lists before populating
-                            document.getElementById('view_company_affiliations_list').innerHTML = '<p class="no-records-message">No records listed.</p>';
-                            document.getElementById('view_existing_banks_list').innerHTML = '<p class="no-records-message">No records listed.</p>';
-                            document.getElementById('view_public_official_relationships_list').innerHTML = '<p class="no-records-message">No records listed.</p>';
+                            // Populate Spouse details
+                            if (data.spouse) {
+                                document.getElementById('view_sp_name').textContent = data.spouse.sp_name || 'N/A';
+                                document.getElementById('view_sp_datebirth').textContent = data.spouse.sp_datebirth || 'N/A';
+                                document.getElementById('view_sp_profession').textContent = data.spouse.sp_profession || 'N/A';
+                            } else {
+                                document.getElementById('view_sp_name').textContent = 'N/A';
+                                document.getElementById('view_sp_datebirth').textContent = 'N/A';
+                                document.getElementById('view_sp_profession').textContent = 'N/A';
+                            }
 
                             // Populate Company Affiliations
-                            if (data.companyAffiliations && data.companyAffiliations.length > 0) {
-                                document.getElementById('view_company_affiliations_list').innerHTML = ''; // Clear "No records"
-                                data.companyAffiliations.forEach(aff => {
+                            const viewCompanyAffiliationsList = document.getElementById('view_company_affiliations_list');
+                            viewCompanyAffiliationsList.innerHTML = ''; // Clear previous content
+                            if (data.company_affiliations && data.company_affiliations.length > 0) {
+                                data.company_affiliations.forEach(aff => {
                                     const affDiv = document.createElement('div');
-                                    affDiv.innerHTML = `<p><strong>Role:</strong> ${aff.depositorRole || 'N/A'}, <strong>Company:</strong> ${aff.companyName || 'N/A'}</p>`;
-                                    document.getElementById('view_company_affiliations_list').appendChild(affDiv);
+                                    affDiv.innerHTML = `<p><strong>Role:</strong> ${aff.depositor_role || 'N/A'}, <strong>Company:</strong> ${aff.dep_compname || 'N/A'}</p>`;
+                                    viewCompanyAffiliationsList.appendChild(affDiv);
                                 });
                             }
+                            checkAndAddNoRecordsMessage(viewCompanyAffiliationsList);
+
 
                             // Populate Existing Bank Accounts
-                            if (data.existingBankAccounts && data.existingBankAccounts.length > 0) {
-                                document.getElementById('view_existing_banks_list').innerHTML = ''; // Clear "No records"
-                                data.existingBankAccounts.forEach(bank => {
+                            const viewExistingBanksList = document.getElementById('view_existing_banks_list');
+                            viewExistingBanksList.innerHTML = ''; // Clear previous content
+                            if (data.existing_banks && data.existing_banks.length > 0) {
+                                data.existing_banks.forEach(bank => {
                                     const bankDiv = document.createElement('div');
-                                    bankDiv.innerHTML = `<p><strong>Bank:</strong> ${bank.bank || 'N/A'}, <strong>Branch:</strong> ${bank.branch || 'N/A'}, <strong>Account Type:</strong> ${bank.accountType || 'N/A'}</p>`;
-                                    document.getElementById('view_existing_banks_list').appendChild(bankDiv);
+                                    bankDiv.innerHTML = `<p><strong>Bank:</strong> ${bank.bank_name || 'N/A'}, <strong>Branch:</strong> ${bank.branch || 'N/A'}, <strong>Account Type:</strong> ${bank.acc_type || 'N/A'}</p>`;
+                                    viewExistingBanksList.appendChild(bankDiv);
                                 });
                             }
+                            checkAndAddNoRecordsMessage(viewExistingBanksList);
+
 
                             // Populate Public Official Relationships
-                            if (data.publicOfficialRelationships && data.publicOfficialRelationships.length > 0) {
-                                document.getElementById('view_public_official_relationships_list').innerHTML = ''; // Clear "No records"
-                                data.publicOfficialRelationships.forEach(rel => {
+                            const viewPublicOfficialRelationshipsList = document.getElementById('view_public_official_relationships_list');
+                            viewPublicOfficialRelationshipsList.innerHTML = ''; // Clear previous content
+                            if (data.public_official_relationships && data.public_official_relationships.length > 0) {
+                                data.public_official_relationships.forEach(rel => {
                                     const relDiv = document.createElement('div');
-                                    relDiv.innerHTML = `<p><strong>Official Name:</strong> ${rel.officialName || 'N/A'}, <strong>Relationship:</strong> ${rel.relationship || 'N/A'}, <strong>Position:</strong> ${rel.position || 'N/A'}</p>`;
-                                    document.getElementById('view_public_official_relationships_list').appendChild(relDiv);
+                                    relDiv.innerHTML = `<p><strong>Official Name:</strong> ${rel.gov_int_name || 'N/A'}, <strong>Relationship:</strong> ${rel.relation_desc || 'N/A'}, <strong>Position:</strong> ${rel.official_position || 'N/A'}, <strong>Branch/Org:</strong> ${rel.branch_orgname || 'N/A'}</p>`;
+                                    viewPublicOfficialRelationshipsList.appendChild(relDiv);
                                 });
                             }
-
-                            // Re-check for "No records listed." messages after population
-                            checkAndAddNoRecordsMessage(document.getElementById('view_company_affiliations_list'));
-                            checkAndAddNoRecordsMessage(document.getElementById('view_existing_banks_list'));
-                            checkAndAddNoRecordsMessage(document.getElementById('view_public_official_relationships_list'));
+                            checkAndAddNoRecordsMessage(viewPublicOfficialRelationshipsList);
 
                         })
                         .catch(error => {
@@ -1334,151 +1525,108 @@
                 });
             }
 
-            // --- Dynamic Fields for Edit Customer Modal ---
+
+            // --- Edit Customer Modal ---
             const editCustomerModal = document.getElementById('editCustomerModal');
             if (editCustomerModal) {
                 const editCompanyAffiliationList = document.getElementById('edit_company_affiliations_list');
-                const editAddCompanyAffiliationBtn = document.getElementById('editCompanyAffiliationBtn');
+                const editAddCompanyAffiliationBtn = document.getElementById('edit_add_company_affiliation');
                 const editBankList = document.getElementById('edit_existing_banks_list');
-                const editAddBankBtn = document.getElementById('editBankBtn');
+                const editAddBankBtn = document.getElementById('edit_add_existing_bank');
                 const editRelationshipList = document.getElementById('edit_public_official_relationships_list');
-                const editAddRelationshipBtn = document.getElementById('editRelationshipBtn');
+                const editAddRelationshipBtn = document.getElementById('edit_add_public_official_relationship');
 
                 // Function to add a company affiliation entry for Edit Modal
                 editAddCompanyAffiliationBtn.addEventListener('click', function() {
-                    const newItem = document.createElement('div');
-                    newItem.className = 'row g-3 mb-2 dynamic-list-item';
-                    newItem.innerHTML = `
-                        <div class="col-md-5">
-                            <label for="edit_depositorRole_new" class="form-label">Depositor Role</label>
-                            <input type="text" class="form-control" name="depositorRole[]" id="edit_depositorRole_new_${Date.now()}">
-                        </div>
-                        <div class="col-md-5">
-                            <label for="edit_companyName_new" class="form-label">Company Name</label>
-                            <input type="text" class="form-control" name="companyName[]" id="edit_companyName_new_${Date.now()}">
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button type="button" class="btn btn-danger remove-item-btn w-100"><i class="fas fa-trash"></i></button>
-                        </div>
-                    `;
-                    editCompanyAffiliationList.appendChild(newItem);
-                    checkAndAddNoRecordsMessage(editCompanyAffiliationList);
-                    newItem.querySelector('.remove-item-btn').addEventListener('click', function() {
-                        newItem.remove();
-                        checkAndAddNoRecordsMessage(editCompanyAffiliationList);
-                    });
+                    addDynamicListItem('edit_company_affiliations_list', companyAffiliationTemplate);
                 });
 
                 // Function to add a bank account entry for Edit Modal
                 editAddBankBtn.addEventListener('click', function() {
-                    const newItem = document.createElement('div');
-                    newItem.className = 'row g-3 mb-2 dynamic-list-item';
-                    newItem.innerHTML = `
-                        <div class="col-md-4">
-                            <label for="edit_bank_new" class="form-label">Bank</label>
-                            <input type="text" class="form-control" name="bank[]" id="edit_bank_new_${Date.now()}">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="edit_branch_new" class="form-label">Branch</label>
-                            <input type="text" class="form-control" name="branch[]" id="edit_branch_new_${Date.now()}">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="edit_accountType_new" class="form-label">Account Type</label>
-                            <input type="text" class="form-control" name="accountType[]" id="edit_accountType_new_${Date.now()}">
-                        </div>
-                        <div class="col-12 d-flex justify-content-end">
-                            <button type="button" class="btn btn-danger remove-item-btn"><i class="fas fa-trash"></i></button>
-                        </div>
-                    `;
-                    editBankList.appendChild(newItem);
-                    checkAndAddNoRecordsMessage(editBankList);
-                    newItem.querySelector('.remove-item-btn').addEventListener('click', function() {
-                        newItem.remove();
-                        checkAndAddNoRecordsMessage(editBankList);
-                    });
+                    addDynamicListItem('edit_existing_banks_list', existingBankTemplate);
                 });
 
                 // Function to add a relationship entry for Edit Modal
                 editAddRelationshipBtn.addEventListener('click', function() {
-                    const newItem = document.createElement('div');
-                    newItem.className = 'row g-3 mb-2 dynamic-list-item';
-                    newItem.innerHTML = `
-                        <div class="col-md-6">
-                            <label for="edit_officialName_new" class="form-label">Name of Official</label>
-                            <input type="text" class="form-control" name="officialName[]" id="edit_officialName_new_${Date.now()}">
-                        </div>
-                        <div class="col-md-6">
-                            <label for="edit_relationship_new" class="form-label">Relationship</label>
-                            <select class="form-select" name="relationship[]" id="edit_relationship_new_${Date.now()}">
-                                <option value="" disabled selected hidden>Select Relationship</option>
-                                <option value="Spouse">Spouse</option>
-                                <option value="Child">Child</option>
-                                <option value="Parent">Parent</option>
-                                <option value="Sibling">Sibling</option>
-                                <option value="Other Relative">Other Relative</option>
-                                <option value="Friend">Friend</option>
-                                <option value="Business Associate">Business Associate</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="edit_position_new" class="form-label">Position</label>
-                            <input type="text" class="form-control" name="position[]" id="edit_position_new_${Date.now()}">
-                        </div>
-                        <div class="col-12 d-flex justify-content-end">
-                            <button type="button" class="btn btn-danger remove-item-btn"><i class="fas fa-trash"></i></button>
-                        </div>
-                    `;
-                    editRelationshipList.appendChild(newItem);
-                    checkAndAddNoRecordsMessage(editRelationshipList);
-                    newItem.querySelector('.remove-item-btn').addEventListener('click', function() {
-                        newItem.remove();
-                        checkAndAddNoRecordsMessage(editRelationshipList);
-                    });
+                    addDynamicListItem('edit_public_official_relationships_list', publicOfficialRelationshipTemplate);
                 });
-
 
                 // Listen for when the edit modal is shown to populate it
                 editCustomerModal.addEventListener('show.bs.modal', function (event) {
                     const button = event.relatedTarget; // Button that triggered the modal
-                    const customerId = button.getAttribute('data-customer-id'); // Extract info from data-* attributes
-                    const editCustomerIdInput = document.getElementById('edit_customerId');
-                    editCustomerIdInput.value = customerId;
+                    const customerId = button.getAttribute('data-customer-id'); 
+                    const editCustomerForm = document.getElementById('editCustomerForm');
+                    editCustomerForm.action = `/admin/edit_customer/${customerId}`; // Set form action for POST
 
                     // Fetch customer data using an API call
-                    fetch(`/api/customer/${customerId}`)
-                        .then(response => response.json())
+                    fetch(`/admin/customer/${customerId}`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.json();
+                        })
                         .then(data => {
                             // Populate personal info
-                            document.getElementById('edit_lastName').value = data.lastName || '';
-                            document.getElementById('edit_middleName').value = data.middleName || '';
-                            document.getElementById('edit_firstName').value = data.firstName || '';
-                            document.getElementById('edit_dob').value = data.dob || '';
-                            document.getElementById('edit_nationality').value = data.nationality || '';
-                            document.getElementById('edit_citizenship').value = data.citizenship || '';
-                            document.getElementById('edit_sex').value = data.sex || '';
-                            document.getElementById('edit_civilStatus').value = data.civilStatus || '';
-                            document.getElementById('edit_contactNo').value = data.contactNo || '';
-                            document.getElementById('edit_emailAddress').value = data.emailAddress || '';
-                            document.getElementById('edit_presentAddress').value = data.presentAddress || '';
+                            document.getElementById('edit_customerId').value = customerId;
+                            document.getElementById('edit_firstName').value = data.customer.custname.split(' ')[0] || '';
+                            document.getElementById('edit_lastName').value = data.customer.custname.split(' ')[1] || '';
+                            document.getElementById('edit_datebirth').value = data.customer.datebirth || '';
+                            document.getElementById('edit_nationality').value = data.customer.nationality || '';
+                            document.getElementById('edit_citizenship').value = data.customer.citizenship || '';
+                            document.getElementById('edit_custsex').value = data.customer.custsex || '';
+                            document.getElementById('edit_placebirth').value = data.customer.placebirth || '';
+                            document.getElementById('edit_civilstatus').value = data.customer.civilstatus || '';
+                            document.getElementById('edit_num_children').value = data.customer.num_children || '0';
+                            document.getElementById('edit_mmaiden_name').value = data.customer.mmaiden_name || '';
+                            document.getElementById('edit_cust_address').value = data.customer.cust_address || '';
+                            document.getElementById('edit_email_address').value = data.customer.email_address || '';
+                            document.getElementById('edit_contact_no').value = data.customer.contact_no || '';
+                            document.getElementById('edit_registration_status').value = data.customer.registration_status || 'Pending';
+
+                            // Populate spouse info
+                            if (data.spouse) {
+                                document.getElementById('edit_sp_name').value = data.spouse.sp_name || '';
+                                document.getElementById('edit_sp_datebirth').value = data.spouse.sp_datebirth || '';
+                                document.getElementById('edit_sp_profession').value = data.spouse.sp_profession || '';
+                            } else {
+                                document.getElementById('edit_sp_name').value = '';
+                                document.getElementById('edit_sp_datebirth').value = '';
+                                document.getElementById('edit_sp_profession').value = '';
+                            }
 
                             // Populate employment info
-                            document.getElementById('edit_occupation').value = data.occupation || '';
-                            document.getElementById('edit_natureOfBusiness').value = data.natureOfBusiness || '';
-                            document.getElementById('edit_monthlyIncome').value = data.monthlyIncome || '';
-                            document.getElementById('edit_sourceOfIncome').value = data.sourceOfIncome || '';
+                            document.getElementById('edit_occ_type').value = data.occupation.occ_type || '';
+                            document.getElementById('edit_bus_nature').value = data.occupation.bus_nature || '';
+                            if (data.employer_details) {
+                                document.getElementById('edit_tin_id').value = data.employer_details.tin_id || '';
+                                document.getElementById('edit_empname').value = data.employer_details.empname || '';
+                                document.getElementById('edit_emp_address').value = data.employer_details.emp_address || '';
+                                document.getElementById('edit_phonefax_no').value = data.employer_details.phonefax_no || '';
+                                document.getElementById('edit_job_title').value = data.employer_details.job_title || '';
+                                document.getElementById('edit_emp_date').value = data.employer_details.emp_date || '';
+                            } else {
+                                document.getElementById('edit_tin_id').value = '';
+                                document.getElementById('edit_empname').value = '';
+                                document.getElementById('edit_emp_address').value = '';
+                                document.getElementById('edit_phonefax_no').value = '';
+                                document.getElementById('edit_job_title').value = '';
+                                document.getElementById('edit_emp_date').value = '';
+                            }
 
                             // Populate financial info
-                            document.getElementById('edit_fundSource').value = data.fundSource || '';
-                            document.getElementById('edit_purposeOfAccount').value = data.purposeOfAccount || '';
+                            document.getElementById('edit_mon_income').value = data.financial_record.mon_income || '';
+                            document.getElementById('edit_ann_income').value = data.financial_record.ann_income || '';
 
                             // Populate Source of Wealth checkboxes
-                            const editSourceOfWealthCheckboxes = document.querySelectorAll('#edit_sourceOfWealthCheckboxes input[type="checkbox"]');
+                            const editSourceOfWealthCheckboxes = document.querySelectorAll('#editSourceOfWealthCheckboxes input[type="checkbox"]');
                             editSourceOfWealthCheckboxes.forEach(checkbox => {
                                 checkbox.checked = false; // Uncheck all first
                             });
-                            if (data.sourceOfWealth && Array.isArray(data.sourceOfWealth)) {
-                                data.sourceOfWealth.forEach(val => {
-                                    const checkbox = document.querySelector(`#edit_sourceOfWealthCheckboxes input[value="${val}"]`);
+                            if (data.financial_record.source_wealth) {
+                                const sources = data.financial_record.source_wealth.split(', ').map(s => s.trim());
+                                sources.forEach(val => {
+                                    const checkbox = document.querySelector(`#editSourceOfWealthCheckboxes input[value="${val}"]`);
                                     if (checkbox) {
                                         checkbox.checked = true;
                                     }
@@ -1486,28 +1634,14 @@
                             }
 
                             // Clear and repopulate dynamic lists for editing
-                            editCompanyAffiliationList.innerHTML = ''; // Clear previous entries
-                            editBankList.innerHTML = '';
-                            editRelationshipList.innerHTML = '';
-
-                            // Populate existing Company Affiliations
-                            if (data.companyAffiliations && data.companyAffiliations.length > 0) {
-                                data.companyAffiliations.forEach(aff => {
-                                    const newItem = document.createElement('div');
-                                    newItem.className = 'row g-3 mb-2 dynamic-list-item';
-                                    newItem.innerHTML = `
-                                        <div class="col-md-5">
-                                            <label for="edit_depositorRole" class="form-label">Depositor Role</label>
-                                            <input type="text" class="form-control" name="depositorRole[]" value="${aff.depositorRole || ''}">
-                                        </div>
-                                        <div class="col-md-5">
-                                            <label for="edit_companyName" class="form-label">Company Name</label>
-                                            <input type="text" class="form-control" name="companyName[]" value="${aff.companyName || ''}">
-                                        </div>
-                                        <div class="col-md-2 d-flex align-items-end">
-                                            <button type="button" class="btn btn-danger remove-item-btn w-100"><i class="fas fa-trash"></i></button>
-                                        </div>
-                                    `;
+                            editCompanyAffiliationList.innerHTML = ''; 
+                            if (data.company_affiliations && data.company_affiliations.length > 0) {
+                                data.company_affiliations.forEach(aff => {
+                                    const tempDiv = document.createElement('div');
+                                    tempDiv.innerHTML = companyAffiliationTemplate;
+                                    const newItem = tempDiv.firstElementChild;
+                                    newItem.querySelector('[name="depositor_role[]"]').value = aff.depositor_role || '';
+                                    newItem.querySelector('[name="dep_compname[]"]').value = aff.dep_compname || '';
                                     editCompanyAffiliationList.appendChild(newItem);
                                     newItem.querySelector('.remove-item-btn').addEventListener('click', function() {
                                         newItem.remove();
@@ -1515,98 +1649,89 @@
                                     });
                                 });
                             }
-
-                            // Populate existing Bank Accounts
-                            if (data.existingBankAccounts && data.existingBankAccounts.length > 0) {
-                                data.existingBankAccounts.forEach(bank => {
-                                    const newItem = document.createElement('div');
-                                    newItem.className = 'row g-3 mb-2 dynamic-list-item';
-                                    newItem.innerHTML = `
-                                        <div class="col-md-4">
-                                            <label for="edit_bank" class="form-label">Bank</label>
-                                            <input type="text" class="form-control" name="bank[]" value="${bank.bank || ''}">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label for="edit_branch" class="form-label">Branch</label>
-                                            <input type="text" class="form-control" name="branch[]" value="${bank.branch || ''}">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label for="edit_accountType" class="form-label">Account Type</label>
-                                            <input type="text" class="form-control" name="accountType[]" value="${bank.accountType || ''}">
-                                        </div>
-                                        <div class="col-12 d-flex justify-content-end">
-                                            <button type="button" class="btn btn-danger remove-item-btn"><i class="fas fa-trash"></i></button>
-                                        </div>
-                                    `;
-                                    editBankList.appendChild(newItem);
-                                    newItem.querySelector('.remove-item-btn').addEventListener('click', function() {
-                                        newItem.remove();
-                                        checkAndAddNoRecordsMessage(editBankList);
-                                    });
-                                });
-                            }
-
-                            // Populate existing Public Official Relationships
-                            if (data.publicOfficialRelationships && data.publicOfficialRelationships.length > 0) {
-                                data.publicOfficialRelationships.forEach(rel => {
-                                    const newItem = document.createElement('div');
-                                    newItem.className = 'row g-3 mb-2 dynamic-list-item';
-                                    newItem.innerHTML = `
-                                        <div class="col-md-6">
-                                            <label for="edit_officialName" class="form-label">Name of Official</label>
-                                            <input type="text" class="form-control" name="officialName[]" value="${rel.officialName || ''}">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label for="edit_relationship" class="form-label">Relationship</label>
-                                            <select class="form-select" name="relationship[]">
-                                                <option value="" disabled selected hidden>Select Relationship</option>
-                                                <option value="Spouse" ${rel.relationship === 'Spouse' ? 'selected' : ''}>Spouse</option>
-                                                <option value="Child" ${rel.relationship === 'Child' ? 'selected' : ''}>Child</option>
-                                                <option value="Parent" ${rel.relationship === 'Parent' ? 'selected' : ''}>Parent</option>
-                                                <option value="Sibling" ${rel.relationship === 'Sibling' ? 'selected' : ''}>Sibling</option>
-                                                <option value="Other Relative" ${rel.relationship === 'Other Relative' ? 'selected' : ''}>Other Relative</option>
-                                                <option value="Friend" ${rel.relationship === 'Friend' ? 'selected' : ''}>Friend</option>
-                                                <option value="Business Associate" ${rel.relationship === 'Business Associate' ? 'selected' : ''}>Business Associate</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label for="edit_position" class="form-label">Position</label>
-                                            <input type="text" class="form-control" name="position[]" value="${rel.position || ''}">
-                                        </div>
-                                        <div class="col-12 d-flex justify-content-end">
-                                            <button type="button" class="btn btn-danger remove-item-btn"><i class="fas fa-trash"></i></button>
-                                        </div>
-                                    `;
-                                    editRelationshipList.appendChild(newItem);
-                                    newItem.querySelector('.remove-item-btn').addEventListener('click', function() {
-                                        newItem.remove();
-                                        checkAndAddNoRecordsMessage(editRelationshipList);
-                                    });
-                                });
-                            }
-
-                            // Initial check for 'No records listed.' messages after populating edit modal
                             checkAndAddNoRecordsMessage(editCompanyAffiliationList);
-                            checkAndAddNoRecordsMessage(editBankList);
-                            checkAndAddNoRecordsMessage(editRelationshipList);
+
+
+                            editExistingBanksList.innerHTML = '';
+                            if (data.existing_banks && data.existing_banks.length > 0) {
+                                data.existing_banks.forEach(bank => {
+                                    const tempDiv = document.createElement('div');
+                                    tempDiv.innerHTML = existingBankTemplate;
+                                    const newItem = tempDiv.firstElementChild;
+                                    newItem.querySelector('[name="bank_name[]"]').value = bank.bank_name || '';
+                                    newItem.querySelector('[name="branch[]"]').value = bank.branch || '';
+                                    newItem.querySelector('[name="acc_type[]"]').value = bank.acc_type || '';
+                                    editExistingBanksList.appendChild(newItem);
+                                    newItem.querySelector('.remove-item-btn').addEventListener('click', function() {
+                                        newItem.remove();
+                                        checkAndAddNoRecordsMessage(editExistingBanksList);
+                                    });
+                                });
+                            }
+                            checkAndAddNoRecordsMessage(editExistingBanksList);
+
+
+                            editPublicOfficialRelationshipsList.innerHTML = '';
+                            if (data.public_official_relationships && data.public_official_relationships.length > 0) {
+                                data.public_official_relationships.forEach(rel => {
+                                    const tempDiv = document.createElement('div');
+                                    tempDiv.innerHTML = publicOfficialRelationshipTemplate;
+                                    const newItem = tempDiv.firstElementChild;
+                                    newItem.querySelector('[name="gov_int_name[]"]').value = rel.gov_int_name || '';
+                                    newItem.querySelector('[name="official_position[]"]').value = rel.official_position || '';
+                                    newItem.querySelector('[name="branch_orgname[]"]').value = rel.branch_orgname || '';
+                                    const relationshipSelect = newItem.querySelector('[name="relation_desc[]"]');
+                                    if (relationshipSelect) {
+                                        relationshipSelect.value = rel.relation_desc || '';
+                                    }
+                                    editPublicOfficialRelationshipsList.appendChild(newItem);
+                                    newItem.querySelector('.remove-item-btn').addEventListener('click', function() {
+                                        newItem.remove();
+                                        checkAndAddNoRecordsMessage(editPublicOfficialRelationshipsList);
+                                    });
+                                });
+                            }
+                            checkAndAddNoRecordsMessage(editPublicOfficialRelationshipsList);
 
                             // Source of Wealth Checkbox Limit for Edit Customer Modal
-                            const editSourceOfWealthCheckboxesInModal = editCustomerModal.querySelectorAll('input[name="sourceOfWealth"]');
+                            const editSourceOfWealthCheckboxesInModal = editCustomerModal.querySelectorAll('input[name="source_wealth[]"]');
                             editSourceOfWealthCheckboxesInModal.forEach(checkbox => {
                                 checkbox.addEventListener('change', function (event) {
-                                    if (event.target.name === 'sourceOfWealth' && event.target.type === 'checkbox') {
-                                        const checkedCount = editCustomerModal.querySelectorAll('input[name="sourceOfWealth"]:checked').length;
+                                    if (event.target.name === 'source_wealth[]' && event.target.type === 'checkbox') {
+                                        const checkedCount = editCustomerModal.querySelectorAll('input[name="source_wealth[]"]:checked').length;
                                         if (checkedCount > 3) {
                                             event.target.checked = false;
-                                            alert('You can select up to three sources of wealth only.');
+                                            // Provide user feedback without using alert()
+                                            let messageContainer = editCustomerModal.querySelector('#editSourceOfWealthMessage');
+                                            if (!messageContainer) {
+                                                const parentDiv = event.target.closest('.checkbox-group');
+                                                if (parentDiv) {
+                                                    messageContainer = document.createElement('div');
+                                                    messageContainer.id = 'editSourceOfWealthMessage';
+                                                    messageContainer.classList.add('text-warning', 'mt-2'); // Bootstrap classes for warning text
+                                                    parentDiv.parentNode.appendChild(messageContainer);
+                                                }
+                                            }
+                                            if (messageContainer) {
+                                                messageContainer.textContent = 'You can select up to three sources of wealth only.';
+                                                setTimeout(() => {
+                                                    messageContainer.textContent = ''; // Clear message after 3 seconds
+                                                }, 3000);
+                                            }
+                                        } else {
+                                            const messageContainer = editCustomerModal.querySelector('#editSourceOfWealthMessage');
+                                            if (messageContainer) {
+                                                messageContainer.textContent = '';
+                                            }
                                         }
                                     }
                                 });
                             });
+
                         })
                         .catch(error => {
                             console.error('Error fetching customer details for edit:', error);
-                            // Handle error, maybe show a message to the user
+                            alert('Failed to load customer details for editing.'); // Placeholder for user feedback
                         });
                 });
             }
@@ -1621,8 +1746,8 @@
                     const deleteCustomerIdInput = document.getElementById('delete_customerId');
 
                     deleteCustomerIdInput.value = customerId;
-                    // Assuming your delete endpoint is /admin/delete_customer/<id>
-                    deleteForm.action = `/admin/delete_customer/${customerId}`;
+                    // Assuming your delete endpoint is /delete_customer (handled by POST form)
+                    // The action is already set on the form, just need to set the hidden input value
                 });
             }
         });
