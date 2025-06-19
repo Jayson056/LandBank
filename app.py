@@ -647,6 +647,7 @@ def registration_success():
     """Renders the registration success page."""
     return render_template('registrationSuccess.html')
 
+
 # Explicitly named endpoint for clarity and to resolve potential routing issues
 @app.route('/admin_dashboard', endpoint='admin_dashboard')
 def admin_dashboard():
