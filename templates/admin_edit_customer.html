@@ -28,12 +28,17 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.2); /* Semi-transparent dark overlay */
+            background: url('/static/assets/landbank-BG.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
             z-index: -1; /* Behind content */
         }
 
         /* Main container for the form, adapted from .profile-form */
         .customer-edit-container { /* Renamed for clarity for edit page */
+            position: relative;
+            z-index: 2;
             background-color: rgba(255, 255, 255, 0.1); /* Slightly transparent white */
             padding: 40px; /* Increased padding */
             border-radius: 10px; /* Slightly less rounded than original profile-form */
@@ -334,6 +339,55 @@
                 border-color: #ccc !important;
             }
         }
+
+        /* Shiny Button Effect (color-adaptive) */
+        .shiny-btn {
+            position: relative;
+            overflow: hidden;
+            color: #fff;
+            border: none;
+            outline: none;
+            transition: background 0.3s, box-shadow 0.3s, transform 0.2s;
+            box-shadow: 0 0 15px rgba(0,0,0,0.08);
+        }
+        .shiny-btn:before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(120deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: 0.5s;
+            z-index: 1;
+        }
+        .shiny-btn:hover:before {
+            left: 100%;
+        }
+        .shiny-btn:active {
+            transform: translateY(1px);
+        }
+        /* Color variants for shiny buttons */
+        .btn-primary.shiny-btn {
+            background: linear-gradient(90deg, #00B86B 0%, #008f53 100%);
+        }
+        .btn-secondary.shiny-btn {
+            background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
+        }
+        .btn-danger.shiny-btn {
+            background: linear-gradient(90deg, #dc3545 0%, #b02a37 100%);
+        }
+        .save-btn.shiny-btn {
+            background: linear-gradient(90deg, #00B86B 0%, #008f53 100%);
+        }
+        .cancel-btn.shiny-btn {
+            background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
+        }
+        .add-item-btn.shiny-btn {
+            background: linear-gradient(90deg, #28a745 0%, #218838 100%);
+        }
+        .remove-item-btn.shiny-btn {
+            background: none;
+            color: #dc3545;
+        }
     </style>
 </head>
 <body>
@@ -342,7 +396,7 @@
         <div class="admin-edit-header">
             <h2><i class="fas fa-user-edit"></i> Edit Customer Details</h2>
             <div class="btn-group" role="group" aria-label="Admin Actions">
-                <a href="{{ url_for('admin_view_customer', cust_no=customer_data.customer.cust_no) }}" class="action-btn cancel-btn">
+                <a href="{{ url_for('admin_view_customer', cust_no=customer_data.customer.cust_no) }}" class="action-btn cancel-btn shiny-btn">
                     <i class="fas fa-times-circle"></i> Cancel
                 </a>
             </div>
@@ -509,14 +563,14 @@
                             <div class="list-group-item-custom">
                                 <input type="text" name="depositor_role[]" placeholder="Role" value="{{ affiliation.depositor_role | default('') }}">
                                 <input type="text" name="dep_compname[]" placeholder="Company Name" value="{{ affiliation.dep_compname | default('') }}">
-                                <button type="button" class="btn btn-sm btn-danger remove-item-btn"><i class="fas fa-minus-circle"></i></button>
+                                <button type="button" class="btn btn-sm btn-danger remove-item-btn shiny-btn"><i class="fas fa-minus-circle"></i></button>
                             </div>
                         {% endfor %}
                     {% else %}
                         <div class="no-records">No company affiliations listed.</div>
                     {% endif %}
                 </div>
-                <button type="button" class="action-btn add-item-btn" data-target="company_affiliations_list" data-fields='[{"name": "depositor_role[]", "placeholder": "Role"}, {"name": "dep_compname[]", "placeholder": "Company Name"}]'>
+                <button type="button" class="action-btn add-item-btn shiny-btn" data-target="company_affiliations_list" data-fields='[{"name": "depositor_role[]", "placeholder": "Role"}, {"name": "dep_compname[]", "placeholder": "Company Name"}]'>
                     <i class="fas fa-plus-circle"></i> Add Affiliation
                 </button>
             </section>
@@ -530,14 +584,14 @@
                                 <input type="text" name="bank_name[]" placeholder="Bank Name" value="{{ bank.bank_name | default('') }}">
                                 <input type="text" name="branch[]" placeholder="Branch" value="{{ bank.branch | default('') }}">
                                 <input type="text" name="acc_type[]" placeholder="Account Type" value="{{ bank.acc_type | default('') }}">
-                                <button type="button" class="btn btn-sm btn-danger remove-item-btn"><i class="fas fa-minus-circle"></i></button>
+                                <button type="button" class="btn btn-sm btn-danger remove-item-btn shiny-btn"><i class="fas fa-minus-circle"></i></button>
                             </div>
                         {% endfor %}
                     {% else %}
                         <div class="no-records">No existing bank accounts listed.</div>
                     {% endif %}
                 </div>
-                <button type="button" class="action-btn add-item-btn" data-target="existing_banks_list" data-fields='[{"name": "bank_name[]", "placeholder": "Bank Name"}, {"name": "branch[]", "placeholder": "Branch"}, {"name": "acc_type[]", "placeholder": "Account Type"}]'>
+                <button type="button" class="action-btn add-item-btn shiny-btn" data-target="existing_banks_list" data-fields='[{"name": "bank_name[]", "placeholder": "Bank Name"}, {"name": "branch[]", "placeholder": "Branch"}, {"name": "acc_type[]", "placeholder": "Account Type"}]'>
                     <i class="fas fa-plus-circle"></i> Add Bank Account
                 </button>
             </section>
@@ -552,23 +606,23 @@
                                 <input type="text" name="official_position[]" placeholder="Position" value="{{ po_rel.official_position | default('') }}">
                                 <input type="text" name="branch_orgname[]" placeholder="Branch/Org" value="{{ po_rel.branch_orgname | default('') }}">
                                 <input type="text" name="relation_desc[]" placeholder="Relationship" value="{{ po_rel.relation_desc | default('') }}">
-                                <button type="button" class="btn btn-sm btn-danger remove-item-btn"><i class="fas fa-minus-circle"></i></button>
+                                <button type="button" class="btn btn-sm btn-danger remove-item-btn shiny-btn"><i class="fas fa-minus-circle"></i></button>
                             </div>
                         {% endfor %}
                     {% else %}
                         <div class="no-records">No public official relationships listed.</div>
                     {% endif %}
                 </div>
-                <button type="button" class="action-btn add-item-btn" data-target="public_official_relationships_list" data-fields='[{"name": "gov_int_name[]", "placeholder": "Official Name"}, {"name": "official_position[]", "placeholder": "Position"}, {"name": "branch_orgname[]", "placeholder": "Branch/Org"}, {"name": "relation_desc[]", "placeholder": "Relationship"}]'>
+                <button type="button" class="action-btn add-item-btn shiny-btn" data-target="public_official_relationships_list" data-fields='[{"name": "gov_int_name[]", "placeholder": "Official Name"}, {"name": "official_position[]", "placeholder": "Position"}, {"name": "branch_orgname[]", "placeholder": "Branch/Org"}, {"name": "relation_desc[]", "placeholder": "Relationship"}]'>
                     <i class="fas fa-plus-circle"></i> Add Relationship
                 </button>
             </section>
 
             <div class="form-actions">
-                <button type="submit" class="action-btn save-btn">
+                <button type="submit" class="action-btn save-btn shiny-btn">
                     <i class="fas fa-save"></i> Save Changes
                 </button>
-                <a href="{{ url_for('admin_view_customer', cust_no=customer_data.customer.cust_no) }}" class="action-btn cancel-btn">
+                <a href="{{ url_for('admin_view_customer', cust_no=customer_data.customer.cust_no) }}" class="action-btn cancel-btn shiny-btn">
                     <i class="fas fa-times-circle"></i> Cancel
                 </a>
             </div>
