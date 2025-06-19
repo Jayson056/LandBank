@@ -6,9 +6,9 @@ import os
 local_db_config = {
     'host': 'dpg-d19tutemcj7s73ettva0-a',
     'port': '5432', # Default PostgreSQL port
-    'user': 'database_landbank_user', # Default PostgreSQL user
+    'user': 'database_lanbank_user', # Default PostgreSQL user
     'password': 'Oky6pZH3n8lBnaAbx9iQodLpWRwF3XIo', # *** IMPORTANT: Change this to your actual PostgreSQL password ***
-    'database': 'database_landbank'
+    'database': 'database_lanbank'
 }
 
 # In a production environment like Render, you will typically get a DATABASE_URL
