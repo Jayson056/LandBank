@@ -1146,12 +1146,12 @@ def admin_edit_customer(cust_no):
             flash(f'Customer with ID {cust_no} not found.', 'danger')
             return redirect(url_for('admin_dashboard_page')) # Use explicit endpoint
 
-        # Separate the fetched data for clarity in the template
-        user_data['occupation'] = {
+        # Corrected variable name: from user_data to customer_data
+        customer_data['occupation'] = {
             'occ_type': customer_data['customer'].get('occ_type'),
             'bus_nature': customer_data['customer'].get('bus_nature')
         }
-        user_data['financial_record'] = {
+        customer_data['financial_record'] = {
             'source_wealth': customer_data['customer'].get('source_wealth'),
             'mon_income': customer_data['customer'].get('mon_income'),
             'ann_income': customer_data['customer'].get('ann_income')
