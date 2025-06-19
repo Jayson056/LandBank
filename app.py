@@ -4,7 +4,8 @@ import uuid # Still used for session/internal if needed, but not for DB IDs
 import os 
 import psycopg2.extras 
 
-from db_config import get_db_url
+# Import both connection URL functions
+from db_config import get_db_url, get_postgres_admin_url
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your_super_secret_key_here') 
@@ -27,6 +28,7 @@ def _generate_next_id(cursor, table_name, id_column, prefix, padding_length):
     E.g., C001, EMP001, SP01.
     """
     # Find the last ID for the given prefix
+    # Use LIKE operator for VARCHAR columns
     cursor.execute(f"SELECT {id_column} FROM {table_name} WHERE {id_column} LIKE %s ORDER BY {id_column} DESC LIMIT 1;", (f"{prefix}%",))
     last_id_result = cursor.fetchone()
 
@@ -36,8 +38,7 @@ def _generate_next_id(cursor, table_name, id_column, prefix, padding_length):
         # Extract the numeric part after the prefix
         try:
             last_id_num_str = last_id[len(prefix):]
-            last_id_num = int(last_id_num_str)
-            next_num = last_id_num + 1
+            next_num = int(last_id_num_str) + 1
         except (ValueError, IndexError):
             # Fallback if the existing ID format is unexpected, start from 1
             print(f"Warning: Malformed ID '{last_id}' found for {table_name}. Generating next ID from 1.")
@@ -45,6 +46,55 @@ def _generate_next_id(cursor, table_name, id_column, prefix, padding_length):
     
     return f"{prefix}{str(next_num).zfill(padding_length)}"
 
+def _reset_database():
+    """
+    Connects as a superuser to drop and recreate the database.
+    WARNING: This will DELETE ALL DATA. Use ONLY for development/testing.
+    Requires POSTGRES_ADMIN_URL in environment or db_config.py.
+    """
+    admin_conn = None
+    admin_cursor = None
+    try:
+        admin_conn_url = get_postgres_admin_url()
+        # Connect to 'postgres' database as it's the default superuser database
+        admin_conn = psycopg2.connect(admin_conn_url)
+        admin_conn.autocommit = True # Autocommit for DDL like DROP/CREATE DATABASE
+        admin_cursor = admin_conn.cursor()
+
+        db_name = get_db_url().split('/')[-1] # Extract database name from app's URL
+
+        print(f"\n--- Attempting to reset database '{db_name}' (DEVELOPMENT ONLY) ---")
+        
+        # Terminate all active connections to the database before dropping
+        admin_cursor.execute(f"""
+            SELECT pg_terminate_backend(pg_stat_activity.pid)
+            FROM pg_stat_activity
+            WHERE pg_stat_activity.datname = '{db_name}'
+              AND pid <> pg_backend_pid();
+        """)
+        print(f"  - Terminated active connections to '{db_name}'.")
+        
+        # Drop and create the database
+        admin_cursor.execute(f"DROP DATABASE IF EXISTS {db_name};")
+        print(f"  - Dropped database '{db_name}'.")
+        admin_cursor.execute(f"CREATE DATABASE {db_name};")
+        print(f"  - Created database '{db_name}'.")
+        print(f"--- Database '{db_name}' reset successfully. ---")
+
+    except psycopg2.Error as err:
+        print(f"ERROR: Database reset failed: {err}")
+        print("Please ensure POSTGRES_ADMIN_URL is correctly configured with superuser credentials.")
+        if debug_mode:
+            raise
+    except Exception as e:
+        print(f"ERROR: An unexpected error occurred during database reset: {e}")
+        if debug_mode:
+            raise
+    finally:
+        if admin_cursor:
+            admin_cursor.close()
+        if admin_conn:
+            admin_conn.close()
 
 # --- Function to Ensure Database Schema (for development/initial setup) ---
 def _ensure_database_schema():
@@ -52,6 +102,9 @@ def _ensure_database_schema():
     Ensures that necessary tables exist and have appropriate types for PostgreSQL.
     This function should typically be run only once, or managed by a proper migration tool.
     For development, it runs on app startup.
+    
+    Includes a conditional database reset if a major schema incompatibility (like UUID vs VARCHAR PK)
+    is detected in debug mode.
     """
     conn = None
     cursor = None
@@ -59,11 +112,47 @@ def _ensure_database_schema():
         conn = get_db_connection()
         if not conn:
             print("Failed to get database connection for schema update.")
-            return
+            # If initial connection fails, try resetting db if in debug mode
+            if debug_mode:
+                _reset_database()
+                conn = get_db_connection() # Try connecting again after reset
+                if not conn:
+                    print("Failed to get database connection even after reset. Exiting schema check.")
+                    return
+            else:
+                return
 
         cursor = conn.cursor()
         conn.autocommit = True # Set to True for schema operations outside of explicit transactions
         print("Attempting to ensure PostgreSQL database schema with custom IDs...\n")
+
+        # --- Check for major schema incompatibility (UUID vs VARCHAR for cust_no) ---
+        # If in debug mode and cust_no is still UUID, force a full database reset.
+        if debug_mode:
+            try:
+                cursor.execute("""
+                    SELECT data_type FROM information_schema.columns
+                    WHERE table_schema = current_schema() AND table_name = 'customer' AND column_name = 'cust_no';
+                """)
+                cust_no_type = cursor.fetchone()
+                if cust_no_type and cust_no_type[0] == 'uuid':
+                    print("\n!!! Detected 'customer.cust_no' is still UUID. Forcing database reset for development. !!!\n")
+                    conn.close() # Close current connection before resetting
+                    _reset_database()
+                    conn = get_db_connection() # Reconnect after reset
+                    if not conn:
+                        print("Failed to reconnect after database reset. Cannot proceed with schema creation.")
+                        return
+                    cursor = conn.cursor()
+                    conn.autocommit = True # Re-enable autocommit for the new cursor
+            except psycopg2.ProgrammingError as e:
+                # This error means the table might not exist yet, which is fine, proceed to create
+                print(f"Schema check warning: {e}. Assuming fresh schema or table creation will follow.")
+                conn.rollback() # Rollback any partial transaction from schema check
+            except Exception as e:
+                print(f"Unexpected error during initial schema type check: {e}")
+                conn.rollback()
+
 
         # Define table creation SQL for PostgreSQL with VARCHAR primary keys
         # Tables are ordered to respect foreign key dependencies.
@@ -182,15 +271,6 @@ def _ensure_database_schema():
             """
         }
 
-        # No need for "uuid-ossp" extension now as we are using VARCHAR IDs
-        # try:
-        #     cursor.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";")
-        #     conn.commit()
-        #     print("  - Ensured 'uuid-ossp' extension is enabled.")
-        # except psycopg2.Error as e:
-        #     print(f"  - WARNING: Could not enable 'uuid-ossp' extension (might already exist or permission issue): {e}")
-        #     conn.rollback() 
-
         for table_name, create_sql in schema_sql.items():
             try:
                 print(f"  - Ensuring table: {table_name}")
@@ -201,11 +281,7 @@ def _ensure_database_schema():
                 print(f"  - ERROR creating/checking table {table_name}: {err}")
                 conn.rollback() 
         
-        # --- ALTER TABLE LOGIC (for financial_record income types and customer status) ---
-        # NOTE: If you are changing existing UUID columns to VARCHAR,
-        # simply running ALTER TABLE TYPE might not work directly if data exists.
-        # This setup assumes a clean database or manual migration outside this script
-        # if existing UUID data needs to be preserved and converted.
+        # --- ALTER TABLE LOGIC (for financial_record income types and customer status, and spouse PK) ---
         try:
             # Check and alter mon_income to TEXT
             cursor.execute("""
@@ -253,9 +329,7 @@ def _ensure_database_schema():
                 print("  - Adding 'spouse_id' column to 'spouse' table...")
                 cursor.execute("ALTER TABLE spouse ADD COLUMN spouse_id VARCHAR(10);")
                 conn.commit()
-                # If there's existing data, populate spouse_id (e.g., from a sequence)
-                # For this setup, assuming new data or fresh start, so just setting it up.
-
+                
                 print("  - Updating spouse table primary key to spouse_id...")
                 # First, drop the old primary key if it existed on cust_no
                 cursor.execute("""
@@ -275,6 +349,9 @@ def _ensure_database_schema():
                 """)
                 conn.commit()
                 # Make cust_no unique in spouse if it's not already
+                # Note: The 'uuid ~~ unknown' error came from here when cust_no was UUID.
+                # Now that schema is being managed more strictly, this should be fine
+                # if the tables are fresh or already VARCHAR.
                 cursor.execute("""
                     DO $$
                     BEGIN
@@ -398,7 +475,7 @@ def submit_registration():
         cust_no = _generate_next_id(cursor, 'customer', 'cust_no', 'C', 3)
         occ_id = _generate_next_id(cursor, 'occupation', 'occ_id', 'OC', 2)
         fin_code = _generate_next_id(cursor, 'financial_record', 'fin_code', 'F', 1)
-        # emp_id and spouse_id will be generated conditionally
+        # emp_id, spouse_id, gov_int_id, bank_code will be generated conditionally as needed
 
         print(f"Generated IDs: cust_no={cust_no}, occ_id={occ_id}, fin_code={fin_code}")
 
@@ -454,6 +531,7 @@ def submit_registration():
             emp_date_str = r2.get('employmentDate') 
             emp_date = emp_date_str if emp_date_str else None # Handle empty date string
             job_title = r2.get('jobTitle', '')
+
 
             sql_emp_details = "INSERT INTO employer_details (emp_id, occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);"
             cursor.execute(sql_emp_details, (emp_id, occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
@@ -797,7 +875,6 @@ def admin_dashboard():
         cursor.execute(sql_query, params)
         customers = cursor.fetchall()
 
-        # No need to convert UUID to string anymore, as cust_no is already VARCHAR
         processed_customers = []
         for customer in customers:
             customer_dict = dict(customer) # Convert row to dictionary for modification
@@ -848,7 +925,7 @@ def admin_add_customer():
         cust_no = _generate_next_id(cursor, 'customer', 'cust_no', 'C', 3)
         occ_id = _generate_next_id(cursor, 'occupation', 'occ_id', 'OC', 2)
         fin_code = _generate_next_id(cursor, 'financial_record', 'fin_code', 'F', 1)
-        # emp_id and spouse_id will be generated conditionally
+        # emp_id, spouse_id, gov_int_id, bank_code will be generated conditionally as needed
 
         # --- Extract form data for Customer table ---
         custname = request.form.get('custname')
@@ -1204,7 +1281,7 @@ def admin_edit_customer(cust_no):
                 existing_spouse_id_result = cursor.fetchone()
 
                 if existing_spouse_id_result:
-                    existing_spouse_id = existing_spouse_id_result[0]
+                    existing_spouse_id = existing_spouse_id_result['spouse_id']
                     cursor.execute("""
                         UPDATE spouse
                         SET sp_name = %s, sp_datebirth = %s, sp_profession = %s
@@ -1221,7 +1298,7 @@ def admin_edit_customer(cust_no):
             if occ_type == 'Employed' and empname: 
                 cursor.execute("SELECT emp_id FROM employment_details WHERE cust_no = %s;", (cust_no,))
                 existing_emp_id_result = cursor.fetchone()
-                existing_emp_id = existing_emp_id_result[0] if existing_emp_id_result else None
+                existing_emp_id = existing_emp_id_result['emp_id'] if existing_emp_id_result else None
 
                 if existing_emp_id:
                     cursor.execute("""
@@ -1270,7 +1347,7 @@ def admin_edit_customer(cust_no):
                     existing_bank_code = cursor.fetchone()
 
                     if existing_bank_code:
-                        current_bank_code = existing_bank_code[0]
+                        current_bank_code = existing_bank_code['bank_code']
                     else:
                         current_bank_code = _generate_next_id(cursor, 'bank_details', 'bank_code', 'B', 1)
                         cursor.execute("INSERT INTO bank_details (bank_code, bank_name, branch) VALUES (%s, %s, %s);", (current_bank_code, b_name, branch))
@@ -1295,7 +1372,7 @@ def admin_edit_customer(cust_no):
                     cursor.execute("SELECT gov_int_id FROM public_official_details WHERE gov_int_name = %s AND official_position = %s AND branch_orgname = %s;", (gov_name, pos, org))
                     po_id_result = cursor.fetchone()
                     if po_id_result:
-                        gov_int_id = po_id_result[0]
+                        gov_int_id = po_id_result['gov_int_id']
                     else:
                         gov_int_id = _generate_next_id(cursor, 'public_official_details', 'gov_int_id', 'OFF', 3)
                         cursor.execute("INSERT INTO public_official_details (gov_int_id, gov_int_name, official_position, branch_orgname) VALUES (%s, %s, %s, %s);", (gov_int_id, gov_name, pos, org))
