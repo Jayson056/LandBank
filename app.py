@@ -504,7 +504,7 @@ def userHome():
             LEFT JOIN occupation o ON c.occ_id = o.occ_id
             LEFT JOIN financial_record f ON c.fin_code = f.fin_code
             WHERE c.cust_no = %s
-        """, (cust_no,))
+        """, (str(cust_no),)) # Convert cust_no to string for psycopg2
         user_data['customer'] = cursor.fetchone()
 
         if not user_data['customer']:
@@ -523,7 +523,7 @@ def userHome():
         }
 
         # Fetch Spouse Information (if exists)
-        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (cust_no,))
+        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (str(cust_no),)) # Convert cust_no to string
         user_data['spouse'] = cursor.fetchone()
 
         # Fetch Employer Details (if exists, linked via employment_details and occupation)
@@ -533,13 +533,13 @@ def userHome():
                 FROM employer_details ed
                 JOIN employment_details empd ON ed.emp_id = empd.emp_id
                 WHERE empd.cust_no = %s
-            """, (cust_no,))
+            """, (str(cust_no),)) # Convert cust_no to string
             user_data['employer_details'] = cursor.fetchone()
         else:
             user_data['employer_details'] = None
 
         # Fetch Company Affiliations
-        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (cust_no,))
+        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (str(cust_no),)) # Convert cust_no to string
         user_data['company_affiliations'] = cursor.fetchall()
 
         # Fetch Existing Bank Accounts
@@ -548,7 +548,7 @@ def userHome():
             FROM existing_bank eb
             JOIN bank_details bd ON eb.bank_code = bd.bank_code
             WHERE eb.cust_no = %s
-        """, (cust_no,))
+        """, (str(cust_no),)) # Convert cust_no to string
         user_data['existing_banks'] = cursor.fetchall()
 
         # Fetch Public Official Relationships
@@ -557,7 +557,7 @@ def userHome():
             FROM cust_po_relationship cpr
             JOIN public_official_details pod ON cpr.gov_int_id = pod.gov_int_id
             WHERE cpr.cust_no = %s
-        """, (cust_no,))
+        """, (str(cust_no),)) # Convert cust_no to string
         user_data['public_official_relationships'] = cursor.fetchall()
 
         return render_template('userHome.html', user_data=user_data)
@@ -729,7 +729,7 @@ def admin_view_customer(cust_no):
             LEFT JOIN occupation o ON c.occ_id = o.occ_id
             LEFT JOIN financial_record f ON c.fin_code = f.fin_code
             WHERE c.cust_no = %s
-        """, (cust_no,))
+        """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
         user_data['customer'] = cursor.fetchone()
 
         if not user_data['customer']:
@@ -748,7 +748,7 @@ def admin_view_customer(cust_no):
         }
 
         # Fetch Spouse Information (if exists)
-        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (cust_no,))
+        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (str(cust_no),)) # CONVERT UUID TO STRING HERE
         user_data['spouse'] = cursor.fetchone()
 
         # Fetch Employer Details (if exists, linked via employment_details and occupation)
@@ -758,13 +758,13 @@ def admin_view_customer(cust_no):
                 FROM employer_details ed
                 JOIN employment_details empd ON ed.emp_id = empd.emp_id
                 WHERE empd.cust_no = %s
-            """, (cust_no,))
+            """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
             user_data['employer_details'] = cursor.fetchone()
         else:
             user_data['employer_details'] = None
 
         # Fetch Company Affiliations
-        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (cust_no,))
+        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (str(cust_no),)) # CONVERT UUID TO STRING HERE
         user_data['company_affiliations'] = cursor.fetchall()
 
         # Fetch Existing Bank Accounts
@@ -773,7 +773,7 @@ def admin_view_customer(cust_no):
             FROM existing_bank eb
             JOIN bank_details bd ON eb.bank_code = bd.bank_code
             WHERE eb.cust_no = %s
-        """, (cust_no,))
+        """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
         user_data['existing_banks'] = cursor.fetchall()
 
         # Fetch Public Official Relationships
@@ -782,7 +782,7 @@ def admin_view_customer(cust_no):
             FROM cust_po_relationship cpr
             JOIN public_official_details pod ON cpr.gov_int_id = pod.gov_int_id
             WHERE cpr.cust_no = %s
-        """, (cust_no,))
+        """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
         user_data['public_official_relationships'] = cursor.fetchall()
 
         # Render the template, passing all collected data in 'user_data'
@@ -876,7 +876,7 @@ def admin_edit_customer(cust_no):
                 RETURNING occ_id, fin_code;
             """, (custname, datebirth, nationality, citizenship, custsex,
                   placebirth, civilstatus, int(num_children), mmaiden_name,
-                  cust_address, email_address, contact_no, cust_no))
+                  cust_address, email_address, contact_no, str(cust_no))) # CONVERT UUID TO STRING HERE
             
             # Fetch the current occ_id and fin_code from customer to update related tables
             current_occ_id, current_fin_code = cursor.fetchone()
@@ -909,19 +909,19 @@ def admin_edit_customer(cust_no):
                             sp_name = EXCLUDED.sp_name,
                             sp_datebirth = EXCLUDED.sp_datebirth,
                             sp_profession = EXCLUDED.sp_profession;
-                    """, (cust_no, sp_name, sp_datebirth, sp_profession))
+                    """, (str(cust_no), sp_name, sp_datebirth, sp_profession)) # CONVERT UUID TO STRING HERE
                 else:
                     # If civil status is married but spouse data is empty, delete spouse record
-                    cursor.execute("DELETE FROM spouse WHERE cust_no = %s;", (cust_no,))
+                    cursor.execute("DELETE FROM spouse WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
             else:
                 # If civil status is not married, ensure no spouse record exists
-                cursor.execute("DELETE FROM spouse WHERE cust_no = %s;", (cust_no,))
+                cursor.execute("DELETE FROM spouse WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
 
             # --- Update Employer Details and Employment Details (Complex - simplified) ---
             # This is a basic update. For full management (add/remove existing), more logic is needed.
             if occ_type == 'Employed':
                 # Fetch existing emp_id for this customer
-                cursor.execute("SELECT emp_id FROM employment_details WHERE cust_no = %s;", (cust_no,))
+                cursor.execute("SELECT emp_id FROM employment_details WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
                 existing_emp_id_result = cursor.fetchone()
                 existing_emp_id = existing_emp_id_result[0] if existing_emp_id_result else None
 
@@ -937,10 +937,10 @@ def admin_edit_customer(cust_no):
                         sql_emp_details = "INSERT INTO employer_details (occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING emp_id;"
                         cursor.execute(sql_emp_details, (current_occ_id, tin_id, empname, emp_address, phonefax_no, job_title, emp_date))
                         new_emp_id = cursor.fetchone()[0]
-                        cursor.execute("INSERT INTO employment_details (cust_no, emp_id) VALUES (%s, %s);", (cust_no, new_emp_id))
+                        cursor.execute("INSERT INTO employment_details (cust_no, emp_id) VALUES (%s, %s);", (str(cust_no), new_emp_id)) # CONVERT UUID TO STRING HERE
             else:
                 # If not employed, delete associated employment and employer details
-                cursor.execute("DELETE FROM employment_details WHERE cust_no = %s;", (cust_no,))
+                cursor.execute("DELETE FROM employment_details WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
                 # Consider if employer_details should be deleted if no other customer references it
                 # This is handled by a similar check in delete_customer, but for simplicity here we'll omit auto-deletion of orphaned employer_details.
 
@@ -950,15 +950,15 @@ def admin_edit_customer(cust_no):
             # 2. Insert new records based on the current form submission.
 
             # Company Affiliations
-            cursor.execute("DELETE FROM company_affiliation WHERE cust_no = %s;", (cust_no,))
+            cursor.execute("DELETE FROM company_affiliation WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
             depositor_roles = request.form.getlist('depositor_role[]')
             dep_compnames = request.form.getlist('dep_compname[]')
             for role, comp_name in zip(depositor_roles, dep_compnames):
                 if role and comp_name:
-                    cursor.execute("INSERT INTO company_affiliation (cust_no, depositor_role, dep_compname) VALUES (%s, %s, %s);", (cust_no, role, comp_name))
+                    cursor.execute("INSERT INTO company_affiliation (cust_no, depositor_role, dep_compname) VALUES (%s, %s, %s);", (str(cust_no), role, comp_name)) # CONVERT UUID TO STRING HERE
 
             # Existing Bank Accounts
-            cursor.execute("DELETE FROM existing_bank WHERE cust_no = %s;", (cust_no,))
+            cursor.execute("DELETE FROM existing_bank WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
             bank_names = request.form.getlist('bank_name[]')
             branches = request.form.getlist('branch[]')
             acc_types = request.form.getlist('acc_type[]')
@@ -966,10 +966,10 @@ def admin_edit_customer(cust_no):
                 if b_name and branch and a_type:
                     # Ensure bank_details exists or create it (ON CONFLICT DO NOTHING)
                     cursor.execute("INSERT INTO bank_details (bank_code, bank_name, branch) VALUES (%s, %s, %s) ON CONFLICT (bank_code) DO NOTHING;", (b_name, b_name, branch))
-                    cursor.execute("INSERT INTO existing_bank (cust_no, bank_code, acc_type) VALUES (%s, %s, %s);", (cust_no, b_name, a_type))
+                    cursor.execute("INSERT INTO existing_bank (cust_no, bank_code, acc_type) VALUES (%s, %s, %s);", (str(cust_no), b_name, a_type)) # CONVERT UUID TO STRING HERE
 
             # Public Official Relationships
-            cursor.execute("DELETE FROM cust_po_relationship WHERE cust_no = %s;", (cust_no,))
+            cursor.execute("DELETE FROM cust_po_relationship WHERE cust_no = %s;", (str(cust_no),)) # CONVERT UUID TO STRING HERE
             gov_int_names = request.form.getlist('gov_int_name[]')
             official_positions = request.form.getlist('official_position[]')
             branch_orgnames = request.form.getlist('branch_orgname[]')
@@ -986,7 +986,7 @@ def admin_edit_customer(cust_no):
                         cursor.execute("INSERT INTO public_official_details (gov_int_name, official_position, branch_orgname) VALUES (%s, %s, %s) RETURNING gov_int_id;", (gov_name, pos, org))
                         gov_int_id = cursor.fetchone()[0]
                     
-                    cursor.execute("INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc) VALUES (%s, %s, %s);", (cust_no, gov_int_id, rel_desc))
+                    cursor.execute("INSERT INTO cust_po_relationship (cust_no, gov_int_id, relation_desc) VALUES (%s, %s, %s);", (str(cust_no), gov_int_id, rel_desc)) # CONVERT UUID TO STRING HERE
             
             conn.commit()
             flash('Customer details updated successfully!', 'success')
@@ -1000,7 +1000,7 @@ def admin_edit_customer(cust_no):
             LEFT JOIN occupation o ON c.occ_id = o.occ_id
             LEFT JOIN financial_record f ON c.fin_code = f.fin_code
             WHERE c.cust_no = %s
-        """, (cust_no,))
+        """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
         customer_data['customer'] = cursor.fetchone()
 
         if not customer_data['customer']:
@@ -1019,7 +1019,7 @@ def admin_edit_customer(cust_no):
         }
 
         # Fetch Spouse Information (if exists)
-        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (cust_no,))
+        cursor.execute("SELECT * FROM spouse WHERE cust_no = %s", (str(cust_no),)) # CONVERT UUID TO STRING HERE
         customer_data['spouse'] = cursor.fetchone()
 
         # Fetch Employer Details (if exists and occupation is 'Employed')
@@ -1029,13 +1029,13 @@ def admin_edit_customer(cust_no):
                 FROM employer_details ed
                 JOIN employment_details empd ON ed.emp_id = empd.emp_id
                 WHERE empd.cust_no = %s
-            """, (cust_no,))
+            """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
             customer_data['employer_details'] = cursor.fetchone()
         else:
             customer_data['employer_details'] = None
 
         # Fetch Company Affiliations
-        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (cust_no,))
+        cursor.execute("SELECT * FROM company_affiliation WHERE cust_no = %s", (str(cust_no),)) # CONVERT UUID TO STRING HERE
         customer_data['company_affiliations'] = cursor.fetchall()
 
         # Fetch Existing Bank Accounts
@@ -1044,7 +1044,7 @@ def admin_edit_customer(cust_no):
             FROM existing_bank eb
             JOIN bank_details bd ON eb.bank_code = bd.bank_code
             WHERE eb.cust_no = %s
-        """, (cust_no,))
+        """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
         customer_data['existing_banks'] = cursor.fetchall()
 
         # Fetch Public Official Relationships
@@ -1053,7 +1053,7 @@ def admin_edit_customer(cust_no):
             FROM cust_po_relationship cpr
             JOIN public_official_details pod ON cpr.gov_int_id = pod.gov_int_id
             WHERE cpr.cust_no = %s
-        """, (cust_no,))
+        """, (str(cust_no),)) # CONVERT UUID TO STRING HERE
         customer_data['public_official_relationships'] = cursor.fetchall()
 
         return render_template('admin_edit_customer.html', customer_data=customer_data)
@@ -1108,7 +1108,7 @@ def delete_customer():
         # are not covered by CASCADE (e.g., if an occ_id or fin_code might become orphaned)
 
         # 1. Get occ_id and fin_code before deleting the customer
-        cursor.execute("SELECT fin_code, occ_id FROM customer WHERE cust_no = %s", (cust_no,))
+        cursor.execute("SELECT fin_code, occ_id FROM customer WHERE cust_no = %s", (str(cust_no),)) # CONVERT UUID TO STRING HERE
         customer_info = cursor.fetchone()
         fin_code = customer_info[0] if customer_info else None
         occ_id = customer_info[1] if customer_info else None
@@ -1121,7 +1121,7 @@ def delete_customer():
         #    - employment_details
         #    - spouse
         # if foreign keys are set up with ON DELETE CASCADE.
-        cursor.execute("DELETE FROM customer WHERE cust_no = %s", (cust_no,))
+        cursor.execute("DELETE FROM customer WHERE cust_no = %s", (str(cust_no),)) # CONVERT UUID TO STRING HERE
         
         # 3. Handle deletion of financial_record and occupation if they are no longer referenced
         if fin_code:
