@@ -195,7 +195,7 @@ def _ensure_database_schema():
 @app.route('/')
 def landing():
     """Renders the landing page."""
-    return render_template('landing.html')
+    return render_template('landingPage.html')
 
 @app.route('/home')
 def home():
