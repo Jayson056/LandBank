@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard - Landbank CIMS</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -96,10 +97,29 @@
         color: white;
     }
     .btn-danger:hover {
+        background: linear: #c82333; /* Danger red */
+        color: white;
+    }
+    .btn-danger:hover {
         background: linear-gradient(to right, #c82333, #dc3545);
     }
     .text-center { /* Ensure text-center remains readable */
         color: #fff;
+    }
+    /* Responsive table styles */
+    @media (max-width: 768px) {
+        .table-responsive {
+            overflow-x: auto; /* Enable horizontal scrolling for tables on small screens */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+        }
+        .table th, .table td {
+            white-space: nowrap; /* Prevent text wrapping in table cells */
+        }
+        .btn-action {
+            display: block; /* Stack buttons vertically on small screens */
+            width: 100%;
+            margin-bottom: 5px; /* Add vertical spacing */
+        }
     }
   </style>
 </head>
@@ -107,53 +127,55 @@
   <div class="container">
     <div class="header">
       <h2>Admin Dashboard</h2>
-      <form action="/logout" method="POST">
+      <form action="{{ url_for('logout') }}" method="POST">
         <button class="btn btn-logout">Logout</button>
       </form>
     </div>
 
     <h4>Registered Customers</h4>
-    <table class="table table-bordered table-hover">
-      <thead class="table-dark">
-        <tr>
-          <th>#</th>
-          <th>Customer No</th>
-          <th>Full Name</th>
-          <th>Email Address</th>
-          <th>Contact No</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for customer in customers %}
-        <tr>
-          <td>{{ loop.index }}</td>
-          <td>{{ customer.cust_no }}</td>
-          <td>{{ customer.custname }}</td>
-          <td>{{ customer.email_address }}</td>
-          <td>{{ customer.contact_no }}</td>
-          <td>
-            <a href="{{ url_for('admin_view_customer', cust_no=customer.cust_no) }}" class="btn btn-view btn-sm btn-action">
-                <i class="fas fa-eye"></i> View
-            </a>
-            <a href="{{ url_for('admin_edit_customer', cust_no=customer.cust_no) }}" class="btn btn-edit btn-sm btn-action">
-                <i class="fas fa-edit"></i> Edit
-            </a>
-            <form action="{{ url_for('delete_customer') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this customer?');" style="display:inline;">
-              <input type="hidden" name="cust_no" value="{{ customer.cust_no }}">
-              <button type="submit" class="btn btn-danger btn-sm btn-action">
-                  <i class="fas fa-trash-alt"></i> Delete
-              </button>
-            </form>
-          </td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="6" class="text-center">No customers found.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="table-responsive"> {# Added for better mobile responsiveness #}
+      <table class="table table-bordered table-hover">
+        <thead class="table-dark">
+          <tr>
+            <th>#</th>
+            <th>Customer No</th>
+            <th>Full Name</th>
+            <th>Email Address</th>
+            <th>Contact No</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for customer in customers %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ customer.cust_no }}</td>
+            <td>{{ customer.custname }}</td>
+            <td>{{ customer.email_address }}</td>
+            <td>{{ customer.contact_no }}</td>
+            <td>
+              <a href="{{ url_for('admin_view_customer', cust_no=customer.cust_no) }}" class="btn btn-view btn-sm btn-action">
+                  <i class="fas fa-eye"></i> View
+              </a>
+              <a href="{{ url_for('admin_edit_customer', cust_no=customer.cust_no) }}" class="btn btn-edit btn-sm btn-action">
+                  <i class="fas fa-edit"></i> Edit
+              </a>
+              <form action="{{ url_for('delete_customer') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this customer?');" style="display:inline;">
+                <input type="hidden" name="cust_no" value="{{ customer.cust_no }}">
+                <button type="submit" class="btn btn-danger btn-sm btn-action">
+                    <i class="fas fa-trash-alt"></i> Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center">No customers found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div> {# End table-responsive #}
   </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
