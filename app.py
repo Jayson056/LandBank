@@ -44,10 +44,39 @@ def _ensure_database_schema():
         print("Attempting to ensure PostgreSQL database schema...\n")
 
         # Define table creation SQL for PostgreSQL
-        # Using UUID for IDs where appropriate for better unique key management.
-        # TEXT is used for longer strings where VARCHAR(255) might be too restrictive.
-        # NUMERIC for incomes to allow proper calculations.
+        # Tables are ordered to respect foreign key dependencies:
+        # Parent tables (no FKs or FKs to already defined tables) come first.
         schema_sql = {
+            'occupation': """
+                CREATE TABLE IF NOT EXISTS occupation (
+                    occ_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    occ_type VARCHAR(255),
+                    bus_nature VARCHAR(255)
+                );
+            """,
+            'financial_record': """
+                CREATE TABLE IF NOT EXISTS financial_record (
+                    fin_code UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    source_wealth TEXT,
+                    mon_income NUMERIC(15, 2), -- Using NUMERIC for financial values
+                    ann_income NUMERIC(15, 2)
+                );
+            """,
+            'bank_details': """
+                CREATE TABLE IF NOT EXISTS bank_details (
+                    bank_code VARCHAR(10) PRIMARY KEY, -- Keeping VARCHAR(10) as it's likely an external code
+                    bank_name VARCHAR(255),
+                    branch VARCHAR(255)
+                );
+            """,
+            'public_official_details': """
+                CREATE TABLE IF NOT EXISTS public_official_details (
+                    gov_int_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    gov_int_name VARCHAR(255),
+                    official_position VARCHAR(255),
+                    branch_orgname VARCHAR(255)
+                );
+            """,
             'customer': """
                 CREATE TABLE IF NOT EXISTS customer (
                     cust_no UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -69,29 +98,6 @@ def _ensure_database_schema():
                     FOREIGN KEY (fin_code) REFERENCES financial_record (fin_code) ON DELETE SET NULL
                 );
             """,
-            'occupation': """
-                CREATE TABLE IF NOT EXISTS occupation (
-                    occ_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    occ_type VARCHAR(255),
-                    bus_nature VARCHAR(255)
-                );
-            """,
-            'financial_record': """
-                CREATE TABLE IF NOT EXISTS financial_record (
-                    fin_code UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    source_wealth TEXT,
-                    mon_income NUMERIC(15, 2), -- Using NUMERIC for financial values
-                    ann_income NUMERIC(15, 2)
-                );
-            """,
-            'credentials': """
-                CREATE TABLE IF NOT EXISTS credentials (
-                    cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
-                    username VARCHAR(255) UNIQUE NOT NULL,
-                    password VARCHAR(255) NOT NULL,
-                    PRIMARY KEY (cust_no, username) -- Composite primary key
-                );
-            """,
             'employer_details': """
                 CREATE TABLE IF NOT EXISTS employer_details (
                     emp_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -104,20 +110,12 @@ def _ensure_database_schema():
                     emp_date DATE
                 );
             """,
-            'public_official_details': """
-                CREATE TABLE IF NOT EXISTS public_official_details (
-                    gov_int_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    gov_int_name VARCHAR(255),
-                    official_position VARCHAR(255),
-                    branch_orgname VARCHAR(255)
-                );
-            """,
-            'cust_po_relationship': """
-                CREATE TABLE IF NOT EXISTS cust_po_relationship (
+            'credentials': """
+                CREATE TABLE IF NOT EXISTS credentials (
                     cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
-                    gov_int_id UUID REFERENCES public_official_details (gov_int_id) ON DELETE CASCADE,
-                    relation_desc VARCHAR(255),
-                    PRIMARY KEY (cust_no, gov_int_id) -- Composite primary key
+                    username VARCHAR(255) UNIQUE NOT NULL,
+                    password VARCHAR(255) NOT NULL,
+                    PRIMARY KEY (cust_no, username) -- Composite primary key
                 );
             """,
             'spouse': """
@@ -136,19 +134,20 @@ def _ensure_database_schema():
                     PRIMARY KEY (cust_no, depositor_role, dep_compname) -- Composite key for uniqueness
                 );
             """,
-            'bank_details': """
-                CREATE TABLE IF NOT EXISTS bank_details (
-                    bank_code VARCHAR(10) PRIMARY KEY, -- Keeping VARCHAR(10) as it's likely an external code
-                    bank_name VARCHAR(255),
-                    branch VARCHAR(255)
-                );
-            """,
             'existing_bank': """
                 CREATE TABLE IF NOT EXISTS existing_bank (
                     cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
                     bank_code VARCHAR(10) REFERENCES bank_details (bank_code) ON DELETE CASCADE,
                     acc_type VARCHAR(255),
                     PRIMARY KEY (cust_no, bank_code, acc_type) -- Composite key for uniqueness
+                );
+            """,
+            'cust_po_relationship': """
+                CREATE TABLE IF NOT EXISTS cust_po_relationship (
+                    cust_no UUID REFERENCES customer (cust_no) ON DELETE CASCADE,
+                    gov_int_id UUID REFERENCES public_official_details (gov_int_id) ON DELETE CASCADE,
+                    relation_desc VARCHAR(255),
+                    PRIMARY KEY (cust_no, gov_int_id) -- Composite primary key
                 );
             """,
             'employment_details': """
@@ -195,7 +194,7 @@ def _ensure_database_schema():
 @app.route('/')
 def landing():
     """Renders the landing page."""
-    return render_template('landingPage.html')
+    return render_template('landing.html')
 
 @app.route('/home')
 def home():
@@ -944,4 +943,3 @@ if __name__ == '__main__':
 
     _ensure_database_schema() # Run schema check/update on app startup
     app.run(host='0.0.0.0', port=port, debug=debug_mode)
-
