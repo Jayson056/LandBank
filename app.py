@@ -7,8 +7,8 @@ import psycopg2.extras
 from db_config import get_db_url
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'your_super_secret_key_here') 
-debug_mode = os.environ.get('FLASK_DEBUG', 'True') == 'True'
+app.secret_key = os.environ.get('SECRET_KEY', 'landbank_cims_session_secret_2026') 
+debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() in ('1', 'true', 'yes')
 
 def get_db_connection():
     """Establishes and returns a database connection using psycopg2 for PostgreSQL."""
